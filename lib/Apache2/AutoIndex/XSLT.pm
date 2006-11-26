@@ -19,7 +19,7 @@
 #
 ############################################################
 
-package Apache2::AuthColloquy;
+package Apache2::AutoIndex::XSLT;
 # vim:ts=4:sw=4:tw=78
 
 use strict;
@@ -124,36 +124,15 @@ sub handler {
 
 =head1 NAME
 
-Apache2::AuthColloquy - mod_perl authentication against the Colloquy users.lua file
+Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
 
 =head1 SYNOPSIS
 
- AuthName "Talker Members Area"
- AuthType Basic
-
- # Full path to your users.lua file or users/ directory
- PerlSetVar users_lua /home/system/colloquy/data
-
- # Set if you want to allow an alternate method of authentication
- PerlSetVar AllowAlternateAuth yes | no
-
- require valid-user
- PerlAuthenHandler Apache2::AuthColloquy
-
 =head1 DESCRIPTION
-
-Apache2::AuthColloquy is an Apache 2 authentication module. It will
-authenticate against a Colloquy users.lua user database file using
-the newer password2 field.
-
-This script munges the users.lua file in to executable perl code
-which is then evaluated. It should therefore be used with caution
-if you cannot gaurentee the integrity of the users.lua file. See
-Colloquy::Data for more details.
 
 =head1 SEE ALSO
 
-L<Colloquy::Data>
+L<Apache::AutoIndex>
 
 =head1 VERSION
 
@@ -165,9 +144,14 @@ Nicola Worthington <nicolaw@cpan.org>
 
 L<http://perlgirl.org.uk>
 
+If you like this software, why not show your appreciation by sending the
+author something nice from her
+L<Amazon wishlist|http://www.amazon.co.uk/gp/registry/1VZXC59ESWYK0?sort=priority>? 
+( http://www.amazon.co.uk/gp/registry/1VZXC59ESWYK0?sort=priority )
+
 =head1 COPYRIGHT
 
-Copyright 2005,2006 Nicola Worthington.
+Copyright 2006 Nicola Worthington.
 
 This software is licensed under The Apache Software License, Version 2.0.
 
