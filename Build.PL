@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 ############################################################
 #
-#   $Id: DistBuild.PL 812 2006-10-25 14:05:57Z nicolaw $
+#   $Id$
 #   DistBuild.PL - CPAN Distribution Build Script for Subversion & CVS
 #
 #   Copyright 2006 Nicola Worthington
@@ -65,7 +65,7 @@ if ($url) {
 		local $SIG{ALRM} = sub { die; };
 		alarm 10;
 		my $ua = LWP::UserAgent->new(
-				agent => 'Build.PL $Revision$',
+				agent => 'Build.PL $Revision: 815 $',
 				timeout => 9,
 				max_size => 500,
 			);
