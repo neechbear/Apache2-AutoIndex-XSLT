@@ -23,25 +23,16 @@ package Apache2::AutoIndex::XSLT;
 # vim:ts=4:sw=4:tw=78
 
 use strict;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-
-use MD5;
+use vars qw($VERSION);
 use mod_perl2;
-use Colloquy::Data qw(:all);
-
-require Exporter;
-
-@ISA = qw(Exporter AutoLoader);
-@EXPORT = qw();
-$VERSION = '1.13' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
-
-# Test for the version of mod_perl, and use the appropriate libraries
-require Apache2::Access;
-require Apache2::Connection;
-require Apache2::Log;
-require Apache2::RequestRec;
-require Apache2::RequestUtil;
 use Apache2::Const -compile => qw(HTTP_UNAUTHORIZED OK DECLINED);
+#require Apache2::Access;
+#require Apache2::Connection;
+#require Apache2::Log;
+#require Apache2::RequestRec;
+#require Apache2::RequestUtil;
+
+$VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 
 # Handles Apache requests
 sub handler {
