@@ -23,90 +23,39 @@ package Apache2::AutoIndex::XSLT;
 # vim:ts=4:sw=4:tw=78
 
 use strict;
+no strict qw(subs);
 use vars qw($VERSION);
-use mod_perl2;
-use Apache2::Const -compile => qw(HTTP_UNAUTHORIZED OK DECLINED);
-#require Apache2::Access;
-#require Apache2::Connection;
-#require Apache2::Log;
-#require Apache2::RequestRec;
-#require Apache2::RequestUtil;
+#use mod_perl2;
+use Apache2::RequestRec qw();
+use Apache2::Const -compile => qw(DIR_MAGIC_TYPE DECLINED);
 
 $VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 
-# Handles Apache requests
+# Let's deal with this another time shall we?
+#if (mod_perl2->module('Apache::Status')){
+#	Apache::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__), \&status);
+#}
+
 sub handler {
 	my $r = shift;
+	return DECLINED unless $r->content_type && $r->content_type eq DIR_MAGIC_TYPE;
 
-	my ($result, $password) = $r->get_basic_auth_pw;
-	return $result if $result;
+	
 
-	my $user = $r->user;
-	my $users_lua = $r->dir_config('users_lua') || '/usr/local/colloquy/data';
-	my $allowaltauth = $r->dir_config('AllowAlternateAuth') || 'no';
+}
 
-	# remove the domainname if logging in from winxp
-	## Parse $name's with Domain\Username
-	my $domain = '';
-	if ($user =~ m|(\w+)[\\/](.+)|) {
-		($domain, $user) = ($1, $2);
-	}
+sub status {
+	my $r = shift;
 
-	# Check that the username doesn't contain characters
-	# denied by Colloquy in main.lua
-	if ($user =~ /\[\!\;\'\:\@\?\,\`\.\]\s/) {
-		$r->note_basic_auth_failure;
-		$r->log_error(
-			"user $user: invalid username contains disallowed characters ",
-			$r->uri);
-		return (lc($allowaltauth) eq "yes" ? Apache2::Const::DECLINED : Apache2::Const::HTTP_UNAUTHORIZED);
-	}
-
-	# Check we have a password
-	unless (length($password)) {
-		$r->note_basic_auth_failure;
-		$r->log_error("user $user: no password supplied for URI ", $r->uri);
-		return Apache2::Const::HTTP_UNAUTHORIZED;
-	}
-
-	# Read the database
-	my $users = {};
+	my @status;
+	push @status, sprintf('<b>%s %s</b><br />', __PACKAGE__, $VERSION);
 	eval {
-		($users) = Colloquy::Data::users($users_lua);
+		require Data::Dumper;
+		my $cfg = Apache::ModuleConfig->get($r);
+		push @status, sprintf('<pre>%s</pre>', Dumper($cfg));
 	};
 
-	# Check we can read the database file
-	if ($@) {
-		$r->note_basic_auth_failure;
-		$r->log_error(
-			"user $user: unable to read users_lua database '$users_lua': $@ at URI ",
-			$r->uri);
-		return (lc($allowaltauth) eq "yes" ? Apache2::Const::DECLINED : Apache2::Const::HTTP_UNAUTHORIZED);
-	}
-
-	# Check we have found that user
-	unless (exists $users->{"$user"}->{password2} || exists $users->{"$user"}->{password}) {
-		$r->note_basic_auth_failure;
-		$r->log_error(
-			"user $user: no valid user found for URI ",
-			$r->uri);
-		return (lc($allowaltauth) eq "yes" ? Apache2::Const::DECLINED : Apache2::Const::HTTP_UNAUTHORIZED);
-	}
-
-	# Now check the password
-	my $db_password_hash = $users->{"$user"}->{password2} || $users->{"$user"}->{password} || '_no_db_passd_';
-	my $our_password_hash = MD5->hexhash("$user$password") || '_no_usr_passd_';
-	if ($our_password_hash eq $db_password_hash) {
-		return Apache2::Const::OK;
-	} else {
-		$r->log_error(
-			"user $user: invalid password for URI ",
-			$r->uri);
-		return (lc($allowaltauth) eq "yes" ? Apache2::Const::DECLINED : Apache2::Const::HTTP_UNAUTHORIZED);
-	}
-
-	# Otherwise fail
-	return (lc($allowaltauth) eq "yes" ? Apache2::Const::DECLINED : Apache2::Const::HTTP_UNAUTHORIZED);
+	return \@status;
 }
 
 1;
