@@ -91,7 +91,7 @@ sub _dir_xml {
 	}
 
 	my $xslt = -f File::Spec->catfile($r->document_root,'index.xslt')
-			? 'index.xslt' : '';
+			? '/index.xslt' : '';
 	_print_xml_header($xslt);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
 
@@ -205,7 +205,7 @@ sub _print_xml_header {
 	@dtd = ();
 
 	print qq{<?xml version="1.0"?>\n};
-	print qq{<?xml-stylesheet type="text/xsl" href="$xslt"?>} if $xslt;
+	print qq{<?xml-stylesheet type="text/xsl" href="$xslt"?>\n} if $xslt;
 	print "$_\n" for @dtd;
 }
 
