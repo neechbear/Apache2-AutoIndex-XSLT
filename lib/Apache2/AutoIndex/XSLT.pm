@@ -25,24 +25,52 @@ package Apache2::AutoIndex::XSLT;
 use 5.6.1;
 use strict;
 use warnings;
-no strict qw(subs); # This is for ./DistBuild.PL only - can be commented out
+#use warnings FATAL => 'all';
+
 use File::Spec qw();
 use Fcntl qw(:mode);
-use Apache2::RequestRec qw();
+use URI::Escape qw(); # Try to replace with Apache2::Util or Apache2::URI
+
 use Apache2::Access qw();
+use Apache2::CmdParms qw();
+use Apache2::Const -compile => qw(:common :options :config DIR_MAGIC_TYPE);
+use Apache2::Directive qw();
 use Apache2::Log qw();
+use Apache2::Module qw();
+use Apache2::RequestRec qw();
+use Apache2::SubRequest qw();
 use Apache2::URI qw();
-use Apache2::Const -compile => qw(:common :options DIR_MAGIC_TYPE);
+use Apache2::Util qw();
 
-use vars qw($VERSION);
-$VERSION = '0.01' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
+# Start here ...
+# http://perl.apache.org/docs/2.0/user/config/custom.html
+# http://perl.apache.org/docs/2.0/api/Apache2/Module.html
+# http://perl.apache.org/docs/2.0/api/Apache2/Const.html
+# http://perl.apache.org/docs/2.0/user/porting/compat.html
+# http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html
+# http://httpd.apache.org/docs/2.2/mod/mod_dir.html
+# http://www.modperl.com/book/chapters/ch8.html
+
+use vars qw($VERSION @DIRECTIVES);
+$VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
+@DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
+	AddIconByEncoding AddIconByType DefaultIcon HeaderName IndexIgnore
+	IndexOptions IndexOrderDefault IndexStyleSheet ReadmeName DirectoryIndex
+	DirectorySlash);
+
+# Let Apache2::Status know we're here if it's hanging around
+eval {
+	Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
+		\&status) if Apache2::Module::loaded('Apache2::Status');
+};
 
 
-# Let's deal with this another time shall we?
-#if (mod_perl2->module('Apache::Status')){
-#	Apache::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__), \&_status);
-#}
 
+
+
+#
+# Apache response handler
+#
 
 sub handler {
 	my $r = shift;
@@ -62,9 +90,16 @@ sub handler {
 
 	# Return a directory listing if we're allowed to
 	if ($r->allow_options & Apache2::Const::OPT_INDEXES) {
-		$r->content_type('text/xml');
+		$r->content_type('text/xml; charset="utf-8"');
 		return Apache2::Const::OK if $r->header_only;
-		return _dir_xml($r);
+
+		# The _dir_xml subroutine will actually print and output
+		# all the XML DTD and XML, returning an OK if everything
+		# was successful.
+		my $rtn = Apache2::Const::SERVER_ERROR;
+		eval { $rtn = _dir_xml($r); };
+#		print $@ if $@;
+		return $rtn;
 
 	# Otherwise he's not the messiah, he's a very naughty boy
 	} else {
@@ -77,71 +112,212 @@ sub handler {
 }
 
 
+
+
+
+
+
+
+
+
+#
+# Apache2::Status status page handler
+#
+
+sub status {
+	my $r = shift;
+
+	my @status;
+	push @status, sprintf('<b>%s %s</b><br />', __PACKAGE__, $VERSION);
+	eval {
+		require Data::Dumper;
+		my $cfg = Apache::ModuleConfig->get($r);
+		push @status, sprintf('<pre>%s</pre>', Dumper($cfg));
+	};
+
+	return \@status;
+}
+
+
+
+
+
+
+
+
+
+
+#
+# Private helper subroutines
+#
+
 sub _dir_xml {
 	my $r = shift;
 
+	# Get query string values
+	my $qstring = {};
+	for (split(/[&;]/,($r->args||''))) {
+		my ($k,$v) = split('=',$_,2);
+		next unless defined $k;
+		$v = '' unless defined $v;
+		$qstring->{URI::Escape::uri_unescape($k)} =
+			URI::Escape::uri_unescape($v);
+	}
+
+	# Get directory to work on
+	my $directory = $r->filename;
+	$r->filename("$directory/") unless $directory =~ m/\/$/;
+
+	# Open the physical directory on disk to get a list of all items inside.
+	# This won't pick up virtual directories aliased in Apache's configs.
 	my $dh;
-	unless (opendir($dh,$r->filename)) {
+	unless (opendir($dh,$directory)) {
 		$r->log_reason(
 				sprintf("%s Unable to open directory handle for '%s': %s",
-					__PACKAGE__, $r->filename, $!),
-				sprintf('%s (%s)', $r->uri, $r->filename),
+					__PACKAGE__, $directory, $!),
+				sprintf('%s (%s)', $r->uri, $directory),
 			);
 		return Apache2::Const::FORBIDDEN;
 	}
 
-	my $xslt = -f File::Spec->catfile($r->document_root,'index.xslt')
-			? '/index.xslt' : '';
-	_print_xml_header($xslt);
+	# Send the XML header and top of the index tree
+	my $xslt = '/index.xslt';
+	_print_xml_header($r,$xslt);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
+	_print_xml_options($r,$qstring);
+	print "\t<updir icon=\"/icons/__back.gif\" />\n" unless $r->uri =~ m,^/?$,;
 
+	# Build a list of attributes for each item in the directory and then
+	# print it as an element in the index tree.
 	while (my $id = readdir($dh)) {
-		next if $id eq '.';
-		next if $id eq '..' && $r->uri =~ m,^/?$,;
-
-		my $filename = File::Spec->catfile($r->filename,$id);
-		my $type = _file_type ($id,$filename);
-		my $attr = _stat_file($filename);
-
-		($attr->{ext}) = $id =~ /\.([a-z0-9_]+)$/i;
-		if ($type eq 'file') {
-			$attr->{icon} = -f File::Spec->catfile($r->document_root,'icons',lc("$attr->{ext}.gif")) ?
-					'/icons/'.lc("$attr->{ext}.gif") : '/icons/__unknown.gif';
-		}
-
-		$attr->{title} = $id;
-		$attr->{desc} = '';
-
-		my $element = sprintf('<%s id="%s" %s />', $type, $id,
-				join(' ',map { sprintf('%s="%s"',$_,$attr->{$_}) }
-					keys(%{$attr})),
-			);
-
-		print "\t$element\n";
+		next if $id =~ /^\./;
+		my $subr = $r->lookup_file($id); # Not used yet
+		my $filename = File::Spec->catfile($directory,$id);
+		my $type = _file_type($r,$id,$filename);
+		my $attr = _build_attributes($r,$id,$filename,$type);
+		printf("\t<%s %s />\n", $type, join(' ',
+					map { sprintf('%s="%s"',$_,$attr->{$_})
+							if defined $_ && defined $attr->{$_} }
+						keys(%{$attr})
+				));
 	}
 
+	# Close the index tree, directory handle and return
 	print "</index>\n";
 	closedir($dh);
 	return Apache2::Const::OK;
 }
 
 
+sub _print_xml_options {
+	my ($r,$qstring) = @_;
+
+	my $format = "\t\t<option name=\"%s\" value=\"%s\" />\n";
+	print "\t<options>\n";
+
+	# Query string options
+	for my $option (qw(C O F V P)) {
+		printf($format,$option,$qstring->{$option});
+	}
+
+	# Apache configuration directives
+	for my $directive (@DIRECTIVES) {
+		printf($format,$directive,'');
+	}
+
+	print "\t</options>\n";
+}
+
+
+sub _build_attributes {
+	my ($r,$id,$filename,$type) = @_;
+	return {} if $type eq 'updir';
+
+	my $attr = _stat_file($r,$filename);
+
+	if ($type eq 'file') {
+		($attr->{ext}) = $id =~ /\.([a-z0-9_]+)$/i;
+		$attr->{icon} = '/icons/__unknown.gif';
+		$attr->{icon} = $attr->{ext} &&
+			-f File::Spec->catfile($r->document_root,'icons',lc("$attr->{ext}.gif"))
+				? '/icons/'.lc("$attr->{ext}.gif")
+				: '/icons/__unknown.gif';
+	}
+
+	$attr->{icon} = '/icons/__dir.gif' if $type eq 'dir';
+	$attr->{icon} = '/icons/__back.gif' if $type eq 'updir';
+
+	unless ($type eq 'updir') {
+		#$attr->{id} = $id; # This serves no real purpose anymor
+		$attr->{href} = URI::Escape::uri_escape($id);
+		$attr->{href} .= '/' if $type eq 'dir';
+		$attr->{title} = $id;
+		#$attr->{desc} = '';
+	}
+
+	return $attr;
+}
+
+
 sub _file_type {
-	my ($id,$filename) = @_;
-	return -d $filename && $id eq '..' ? 'updir' :
-#		$id =~ /^(My[ -_]?(Computer|Documents|Pictures|Videos|Music)|
-#		Network[ -_]?Neighborhood|Logitech[ -_]?Webcam|Control[ -_]?Panel)
-#		$/xi ? 'special' :
-#			-l $filename ? 'link' :
-			-d $filename ? 'dir' :
-			'file';
+	my ($r,$id,$file) = @_;
+	return -d $file && $id eq '..' ? 'updir' : -d $file ? 'dir' : 'file';
+}
+
+
+sub _print_xml_header {
+	my ($r,$xslt) = @_;
+
+	print qq{<?xml version="1.0"?>\n};
+	print qq{<?xml-stylesheet type="text/xsl" href="$xslt"?>\n} if $xslt;
+	print qq{$_\n} for (
+			'<!DOCTYPE index [',
+			'  <!ELEMENT index (options?, updir?, (file | dir)*)>',
+			'  <!ATTLIST index href    CDATA #REQUIRED',
+			'                  path    CDATA #REQUIRED>',
+			'  <!ELEMENT options (option*)>',
+			'  <!ATTLIST options name  CDATA #REQUIRED',
+			'                    value CDATA #IMPLIED>',
+			'  <!ELEMENT updir EMPTY>',
+			'  <!ATTLIST updir icon    CDATA #IMPLIED>',
+			'  <!ELEMENT file  EMPTY>',
+			'  <!ATTLIST file  href    CDATA #REQUIRED',
+			'                  title   CDATA #REQUIRED',
+			'                  desc    CDATA #IMPLIED',
+			'                  owner   CDATA #IMPLIED',
+			'                  group   CDATA #IMPLIED',
+			'                  uid     CDATA #REQUIRED',
+			'                  gid     CDATA #REQUIRED',
+			'                  ctime   CDATA #REQUIRED',
+			'                  mtime   CDATA #REQUIRED',
+			'                  perms   CDATA #REQUIRED',
+			'                  size    CDATA #REQUIRED',
+			'                  icon    CDATA #IMPLIED',
+			'                  ext     CDATA #IMPLIED>',
+			'  <!ELEMENT dir   EMPTY>',
+			'  <!ATTLIST dir   href    CDATA #REQUIRED',
+			'                  title   CDATA #REQUIRED',
+			'                  desc    CDATA #IMPLIED',
+			'                  owner   CDATA #IMPLIED',
+			'                  group   CDATA #IMPLIED',
+			'                  uid     CDATA #REQUIRED',
+			'                  gid     CDATA #REQUIRED',
+			'                  ctime   CDATA #REQUIRED',
+			'                  mtime   CDATA #REQUIRED',
+			'                  perms   CDATA #REQUIRED',
+			'                  size    CDATA #REQUIRED',
+			'                  icon    CDATA #IMPLIED>',
+			']>',
+		);
 }
 
 
 sub _stat_file {
+	my ($r,$filename) = @_;
+
 	my %stat;
 	@stat{qw(dev ino mode nlink uid gid rdev size
-			atime mtime ctime blksize blocks)} = lstat($_[0]);
+			atime mtime ctime blksize blocks)} = lstat($filename);
 
 	my %rtn;
 	$rtn{$_} = $stat{$_} for qw(uid gid mtime ctime size);
@@ -149,12 +325,25 @@ sub _stat_file {
 	$rtn{owner} = scalar getpwuid($rtn{uid});
 	$rtn{group} = scalar getgrgid($rtn{gid});
 
+	# Reformat times to this format: yyyy-mm-ddThh:mm-tz:tz
+	for (qw(mtime ctime)) {
+		$rtn{$_} = Apache2::Util::ht_time(
+				$r->pool, $rtn{$_},
+				'%Y-%m-%dT%H:%M-00:00',
+				0,
+			);
+	}
+
 	return \%rtn;
 }
 
 
 sub _file_mode {
 	my $mode = shift;
+
+	# This block of code is taken with thanks from
+	# http://zarb.org/~gc/resource/find_recent,
+	# written by Guillaume Cottenceau.
 	return (S_ISREG($mode)  ? '-' :
 			S_ISDIR($mode)  ? 'd' :
 			S_ISLNK($mode)  ? 'l' :
@@ -180,52 +369,46 @@ sub _file_mode {
 }
 
 
-sub _print_xml_header {
-	my $xslt = shift;
-
-	my @dtd = (
-			'<!DOCTYPE svn [',
-			'  <!ELEMENT svn   (index)>',
-			'  <!ATTLIST svn   version CDATA #REQUIRED',
-			'                  href    CDATA #REQUIRED>',
-			'  <!ELEMENT index (updir?, (file | dir)*)>',
-			'  <!ATTLIST index name    CDATA #IMPLIED',
-			'                  path    CDATA #IMPLIED',
-			'                  rev     CDATA #IMPLIED>',
-			'  <!ELEMENT updir EMPTY>',
-			'  <!ELEMENT file  EMPTY>',
-			'  <!ATTLIST file  name    CDATA #REQUIRED',
-			'                  href    CDATA #REQUIRED>',
-			'  <!ELEMENT dir   EMPTY>',
-			'',
-			'  <!ATTLIST dir   name    CDATA #REQUIRED',
-			'                  href    CDATA #REQUIRED>',
-			']>',
-		);
-	@dtd = ();
-
-	print qq{<?xml version="1.0"?>\n};
-	print qq{<?xml-stylesheet type="text/xsl" href="$xslt"?>\n} if $xslt;
-	print "$_\n" for @dtd;
-}
 
 
-sub _status {
-	my $r = shift;
 
-	my @status;
-	push @status, sprintf('<b>%s %s</b><br />', __PACKAGE__, $VERSION);
-	eval {
-		require Data::Dumper;
-		my $cfg = Apache::ModuleConfig->get($r);
-		push @status, sprintf('<pre>%s</pre>', Dumper($cfg));
-	};
 
-	return \@status;
-}
 
+
+
+
+#
+# Handle all Apache configuration directives
+#
+
+sub SERVER_CREATE {}
+sub DIR_CREATE {}
+sub SERVER_MERGE {}
+sub DIR_MERGE {}
+
+sub AddAlt {}
+sub AddAltByEncoding {}
+sub AddAltByType {}
+sub AddDescription {}
+sub AddIcon {}
+sub AddIconByEncoding {}
+sub AddIconByType {}
+sub DefaultIcon {}
+sub HeaderName {}
+sub IndexIgnore {}
+sub IndexOptions {}
+sub IndexOrderDefault {}
+sub IndexStyleSheet {}
+sub ReadmeName {}
+sub DirectoryIndex {}
+sub DirectorySlash {}
 
 1;
+
+
+
+
+
 
 =pod
 
@@ -237,6 +420,7 @@ Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
 
  <Location />
      SetHandler perl-script
+     PerlLoadModule Apache2::AutoIndex::XSLT
      PerlResponseHandler Apache2::AutoIndex::XSLT
      Options +Indexes
  </Location>
@@ -247,11 +431,49 @@ This module is designed as a drop in mod_perl2 replacement for the mod_dir and
 mod_index modules. It uses user configurable XSLT stylesheets to generate the
 directory listings.
 
-THIS IS A DEVELOPMENT RELEASE.
+THIS IS A DEVELOPMENT RELEASE!
+
+=head1 CONFIGURATION
+
+=head2 AddAlt
+
+=head2 AddAltByEncoding
+
+=head2 AddAltByType
+
+=head2 AddIcon
+
+=head2 AddIconByEncoding
+
+=head2 AddIconByType
+
+=head2 DefaultIcon
+
+=head2 DirectorySlash
+
+=head2 IndexStyleSheet
+
+=head2 AddDescription
+
+=head2 DirectoryIndex
+
+=head2 FancyIndexing
+
+=head2 HeaderName
+
+=head2 IndexIgnore
+
+=head2 IndexOptions
+
+=head2 IndexOrderDefault
+
+=head2 ReadmeName
 
 =head1 SEE ALSO
 
-L<Apache::AutoIndex>
+L<Apache::AutoIndex>,
+L<http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html>,
+L<http://httpd.apache.org/docs/2.2/mod/mod_dir.html>
 
 =head1 VERSION
 
