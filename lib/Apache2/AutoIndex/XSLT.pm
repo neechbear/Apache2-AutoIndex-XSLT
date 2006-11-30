@@ -28,21 +28,38 @@ use warnings;
 #use warnings FATAL => 'all';
 
 use File::Spec qw();
-use Fcntl qw(:mode);
+use Fcntl qw();
 use URI::Escape qw(); # Try to replace with Apache2::Util or Apache2::URI
 
-use Apache2::Access qw();
-use Apache2::CmdParms qw();
-use Apache2::Const -compile => qw(:common :options :config DIR_MAGIC_TYPE);
-use Apache2::Directive qw();
-use Apache2::Log qw();
-use Apache2::Module qw();
+# This is libapreq2 - we're parsing the query string manually
+# to avoid loading another non-standard module
+# use Apache2::Request qw(); 
+
+# These two are required in general
 use Apache2::ServerRec qw();
 use Apache2::RequestRec qw();
-use Apache2::SubRequest qw();
+
+# Used to return various Apache constant response codes
+use Apache2::Const -compile => qw(:common :options :config DIR_MAGIC_TYPE);
+
+# Used for writing to Apache logs
+use Apache2::Log qw();
+
+# Used for parsing Apache configuration directives
+use Apache2::Module qw();
+use Apache2::CmdParms qw(); # Needed for use with Apache2::Module callbacks
+
+# Used to get the main server Apache2::ServerRec (not the virtual ServerRec)
 use Apache2::ServerUtil qw();
-use Apache2::URI qw();
+
+# Used for Apache2::Util::ht_time time formatting
 use Apache2::Util qw();
+
+use Apache2::URI qw(); # Needed for $r->construct_url
+
+#use Apache2::Access qw();     # Possibly not needed
+#use Apache2::Directive qw();  # Possibly not needed
+#use Apache2::SubRequest qw(); # Possibly not needed
 
 # Start here ...
 # http://perl.apache.org/docs/2.0/user/config/custom.html
@@ -62,10 +79,12 @@ $VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 	DirectorySlash);
 
 # Let Apache2::Status know we're here if it's hanging around
-eval {
-	Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
-		\&status) if Apache2::Module::loaded('Apache2::Status');
-};
+eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
+	\&status) if Apache2::Module::loaded('Apache2::Status'); };
+
+# Register our interesting in a bunch of Apache configuration directives
+eval { Apache2::Module::add(__PACKAGE__, [ map { { name => $_ } } @DIRECTIVES ]); };
+if ($@) { warn $@; print $@; }
 
 
 
@@ -78,40 +97,24 @@ eval {
 sub handler {
 	my $r = shift;
 
-      my %secs = ();
-  
-      $r->content_type('text/plain');
-  
-      my $s = $r->server;
-      my $dir_cfg = get_config($s, $r->per_dir_config);
-      my $srv_cfg = get_config($s);
-  
-      if ($s->is_virtual) {
-          $secs{"1: Main Server"}  = get_config(Apache2::ServerUtil->server);
-          $secs{"2: Virtual Host"} = $srv_cfg;
-          $secs{"3: Location"}     = $dir_cfg;
-      }
-      else {
-          $secs{"1: Main Server"}  = $srv_cfg;
-          $secs{"2: Location"}     = $dir_cfg;
-       }
-  
-      $r->printf("Processing by %s.\n", 
-          $s->is_virtual ? "virtual host" : "main server");
-  
-      for my $sec (sort keys %secs) {
-          $r->print("\nSection $sec\n");
-          for my $k (sort keys %{ $secs{$sec}||{} }) {
-              my $v = exists $secs{$sec}->{$k}
-                  ? $secs{$sec}->{$k}
-                  : 'UNSET';
-              $v = '[' . (join ", ", map {qq{"$_"}} @$v) . ']'
-                  if ref($v) eq 'ARRAY';
-              $r->printf("%-10s : %s\n", $k, $v);
-          }
-      }
-  
-      return Apache2::Const::OK;
+	# Get query string values - use this manual code instead of
+	# Apache2::Request because it uses less memory, and Apache2::Request
+	# does not come as standard with mod_perl2 (it's libapreq2 on CPAN)
+	my $qstring = {};
+	for (split(/[&;]/,($r->args||''))) {
+		my ($k,$v) = split('=',$_,2);
+		next unless defined $k;
+		$v = '' unless defined $v;
+		$qstring->{URI::Escape::uri_unescape($k)} =
+			URI::Escape::uri_unescape($v);
+	}
+
+	# Dump the configuration out to screen
+	if (defined $qstring->{CONFIG}) {
+		$r->content_type('text/plain');
+		print dump_apache_configuration($r);
+		return Apache2::Const::OK;
+	}
 
 	# Only handle directories
 	return Apache2::Const::DECLINED unless $r->content_type &&
@@ -135,7 +138,7 @@ sub handler {
 		# all the XML DTD and XML, returning an OK if everything
 		# was successful.
 		my $rtn = Apache2::Const::SERVER_ERROR;
-		eval { $rtn = dir_xml($r); };
+		eval { $rtn = dir_xml($r,$qstring); };
 		if ($@) {
 			$COUNTERS{Errors}++;
 			warn $@, print $@;
@@ -180,16 +183,8 @@ sub status {
 	}
 	push @status, "</table>\n";
 
-	eval {
-		require Data::Dumper;
-		my $srv_cfg = get_config(Apache2::ServerUtil->server);
-		my $vrt_cfg = get_config($r->server);
-		my $dir_cfg = get_config($r->server, $r->per_dir_config);
-		push @status, sprintf('<b>srv_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($srv_cfg));
-		push @status, sprintf('<b>vrt_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($vrt_cfg));
-		push @status, sprintf('<b>dir_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($dir_cfg));
-	};
-	push @status, $@;
+	push @status, "<p><b>Configuration:</b><br />\n";
+	push @status, dump_apache_configuration($r)."</p>\n";
 
 	return \@status;
 }
@@ -208,20 +203,10 @@ sub status {
 #
 
 sub dir_xml {
-	my $r = shift;
+	my ($r,$qstring) = @_;
 
 	# Increment listings counter
 	$COUNTERS{Listings}++;
-
-	# Get query string values
-	my $qstring = {};
-	for (split(/[&;]/,($r->args||''))) {
-		my ($k,$v) = split('=',$_,2);
-		next unless defined $k;
-		$v = '' unless defined $v;
-		$qstring->{URI::Escape::uri_unescape($k)} =
-			URI::Escape::uri_unescape($v);
-	}
 
 	# Get directory to work on
 	my $directory = $r->filename;
@@ -243,15 +228,6 @@ sub dir_xml {
 	my $xslt = '/index.xslt';
 	print_xml_header($r,$xslt);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
-
-		require Data::Dumper;
-		my $srv_cfg = get_config(Apache2::ServerUtil->server);
-		my $vrt_cfg = get_config($r->server);
-		my $dir_cfg = get_config($r->server, $r->per_dir_config);
-		printf('<b>srv_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($srv_cfg));
-		printf('<b>vrt_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($vrt_cfg));
-		printf('<b>dir_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($dir_cfg));
-
 	print_xml_options($r,$qstring);
 	print "\t<updir icon=\"/icons/__back.gif\" />\n" unless $r->uri =~ m,^/?$,;
 
@@ -266,7 +242,7 @@ sub dir_xml {
 		my $attr = build_attributes($r,$id,$filename,$type);
 
 		printf("\t<%s %s />\n", $type, join(' ',
-					map { sprintf('%s="%s"',$_,$attr->{$_})
+					map { sprintf("\n\t\t%s=\"%s\"",$_,$attr->{$_})
 							if defined $_ && defined $attr->{$_} }
 						keys(%{$attr})
 				));
@@ -290,12 +266,22 @@ sub print_xml_options {
 
 	# Query string options
 	for my $option (qw(C O F V P)) {
-		printf($format,$option,$qstring->{$option});
+		printf($format,$option,$qstring->{$option})
+			if defined $qstring->{$option} &&
+				$qstring->{$option} =~ /\S+/;
 	}
 
 	# Apache configuration directives
-	for my $directive (@DIRECTIVES) {
-		printf($format,$directive,'');
+	my $cfg = get_config($r->server, $r->per_dir_config);
+	for my $d (@DIRECTIVES) {
+		for my $value ((
+			!exists($cfg->{$d}) ? ()
+								: ref($cfg->{$d}) eq 'ARRAY'
+								? $cfg->{$d}
+								: ($cfg->{$d})
+				)) {
+			printf($format,$d,$value);
+		}
 	}
 
 	print "\t</options>\n";
@@ -346,42 +332,57 @@ sub print_xml_header {
 	print qq{$_\n} for (
 			'<!DOCTYPE index [',
 			'  <!ELEMENT index (options?, updir?, (file | dir)*)>',
-			'  <!ATTLIST index href    CDATA #REQUIRED',
-			'                  path    CDATA #REQUIRED>',
+			'  <!ATTLIST index href      CDATA #REQUIRED',
+			'                  path      CDATA #REQUIRED>',
 			'  <!ELEMENT options (option*)>',
-			'  <!ATTLIST options name  CDATA #REQUIRED',
-			'                    value CDATA #IMPLIED>',
+			'  <!ELEMENT option EMPTY>',
+			'  <!ATTLIST option name     CDATA #REQUIRED',
+			'                   value    CDATA #IMPLIED>',
 			'  <!ELEMENT updir EMPTY>',
-			'  <!ATTLIST updir icon    CDATA #IMPLIED>',
+			'  <!ATTLIST updir icon      CDATA #IMPLIED>',
 			'  <!ELEMENT file  EMPTY>',
-			'  <!ATTLIST file  href    CDATA #REQUIRED',
-			'                  title   CDATA #REQUIRED',
-			'                  desc    CDATA #IMPLIED',
-			'                  owner   CDATA #IMPLIED',
-			'                  group   CDATA #IMPLIED',
-			'                  uid     CDATA #REQUIRED',
-			'                  gid     CDATA #REQUIRED',
-			'                  ctime   CDATA #REQUIRED',
-			'                  mtime   CDATA #REQUIRED',
-			'                  perms   CDATA #REQUIRED',
-			'                  size    CDATA #REQUIRED',
-			'                  icon    CDATA #IMPLIED',
-			'                  ext     CDATA #IMPLIED>',
+			'  <!ATTLIST file  href      CDATA #REQUIRED',
+			'                  title     CDATA #REQUIRED',
+			'                  desc      CDATA #IMPLIED',
+			'                  owner     CDATA #IMPLIED',
+			'                  group     CDATA #IMPLIED',
+			'                  uid       CDATA #REQUIRED',
+			'                  gid       CDATA #REQUIRED',
+			'                  ctime     CDATA #REQUIRED',
+			'                  nicectime CDATA #IMPLIED',
+			'                  mtime     CDATA #REQUIRED',
+			'                  nicemtime CDATA #IMPLIED',
+			'                  perms     CDATA #REQUIRED',
+			'                  size      CDATA #REQUIRED',
+			'                  nicesize  CDATA #IMPLIED',
+			'                  icon      CDATA #IMPLIED',
+			'                  ext       CDATA #IMPLIED>',
 			'  <!ELEMENT dir   EMPTY>',
-			'  <!ATTLIST dir   href    CDATA #REQUIRED',
-			'                  title   CDATA #REQUIRED',
-			'                  desc    CDATA #IMPLIED',
-			'                  owner   CDATA #IMPLIED',
-			'                  group   CDATA #IMPLIED',
-			'                  uid     CDATA #REQUIRED',
-			'                  gid     CDATA #REQUIRED',
-			'                  ctime   CDATA #REQUIRED',
-			'                  mtime   CDATA #REQUIRED',
-			'                  perms   CDATA #REQUIRED',
-			'                  size    CDATA #REQUIRED',
-			'                  icon    CDATA #IMPLIED>',
+			'  <!ATTLIST dir   href      CDATA #REQUIRED',
+			'                  title     CDATA #REQUIRED',
+			'                  desc      CDATA #IMPLIED',
+			'                  owner     CDATA #IMPLIED',
+			'                  group     CDATA #IMPLIED',
+			'                  uid       CDATA #REQUIRED',
+			'                  gid       CDATA #REQUIRED',
+			'                  ctime     CDATA #REQUIRED',
+			'                  nicectime CDATA #IMPLIED',
+			'                  mtime     CDATA #REQUIRED',
+			'                  nicemtime CDATA #IMPLIED',
+			'                  perms     CDATA #REQUIRED',
+			'                  size      CDATA #REQUIRED',
+			'                  nicesize  CDATA #IMPLIED',
+			'                  icon      CDATA #IMPLIED>',
 			']>',
 		);
+}
+
+
+sub comify {
+	local $_ = shift;
+	s/^\s+|\s+$//g;
+	1 while s/^([-+]?\d+)(\d{3})/$1,$2/;
+	return $_;
 }
 
 
@@ -398,11 +399,27 @@ sub stat_file {
 	$rtn{owner} = scalar getpwuid($rtn{uid});
 	$rtn{group} = scalar getgrgid($rtn{gid});
 
+	$rtn{nicesize} = comify(sprintf('%d KB',
+						($rtn{size} + ($rtn{size} ? 1024 : 0))/1024
+					));
+#	eval {
+#		require Number::Format;
+#		my $format = new Number::Format;
+#		$rtn{nicesize} = $format->format_bytes($rtn{size},0).'B';
+#		$rtn{nicesize} =~ s/(\D+)$/ $1/;
+#	};
+
 	# Reformat times to this format: yyyy-mm-ddThh:mm-tz:tz
 	for (qw(mtime ctime)) {
+		my $time = $rtn{$_};
 		$rtn{$_} = Apache2::Util::ht_time(
-				$r->pool, $rtn{$_},
+				$r->pool, $time,
 				'%Y-%m-%dT%H:%M-00:00',
+				0,
+			);
+		$rtn{"nice$_"} = Apache2::Util::ht_time(
+				$r->pool, $time,
+				'%d/%m/%Y %H:%M',
 				0,
 			);
 	}
@@ -417,28 +434,29 @@ sub file_mode {
 	# This block of code is taken with thanks from
 	# http://zarb.org/~gc/resource/find_recent,
 	# written by Guillaume Cottenceau.
-	return (S_ISREG($mode)  ? '-' :
-			S_ISDIR($mode)  ? 'd' :
-			S_ISLNK($mode)  ? 'l' :
-			S_ISBLK($mode)  ? 'b' :
-			S_ISCHR($mode)  ? 'c' :
-			S_ISFIFO($mode) ? 'p' :
-			S_ISSOCK($mode) ? 's' : '?' ) .
+	return (
+		Fcntl::S_ISREG($mode)  ? '-' :
+		Fcntl::S_ISDIR($mode)  ? 'd' :
+		Fcntl::S_ISLNK($mode)  ? 'l' :
+		Fcntl::S_ISBLK($mode)  ? 'b' :
+		Fcntl::S_ISCHR($mode)  ? 'c' :
+		Fcntl::S_ISFIFO($mode) ? 'p' :
+		Fcntl::S_ISSOCK($mode) ? 's' : '?' ) .
 
-			( ($mode & S_IRUSR) ? 'r' : '-' ) .
-			( ($mode & S_IWUSR) ? 'w' : '-' ) .
-			( ($mode & S_ISUID) ? (($mode & S_IXUSR) ? 's' : 'S')
-								: (($mode & S_IXUSR) ? 'x' : '-') ) .
+		( ($mode & Fcntl::S_IRUSR()) ? 'r' : '-' ) .
+		( ($mode & Fcntl::S_IWUSR()) ? 'w' : '-' ) .
+		( ($mode & Fcntl::S_ISUID()) ? (($mode & Fcntl::S_IXUSR()) ? 's' : 'S')
+									: (($mode & Fcntl::S_IXUSR()) ? 'x' : '-') ) .
 
-			( ($mode & S_IRGRP) ? 'r' : '-' ) .
-			( ($mode & S_IWGRP) ? 'w' : '-' ) .
-			( ($mode & S_ISGID) ? (($mode & S_IXGRP) ? 's' : 'S')
-								: (($mode & S_IXGRP) ? 'x' : '-') ) .
+		( ($mode & Fcntl::S_IRGRP()) ? 'r' : '-' ) .
+		( ($mode & Fcntl::S_IWGRP()) ? 'w' : '-' ) .
+		( ($mode & Fcntl::S_ISGID()) ? (($mode & Fcntl::S_IXGRP()) ? 's' : 'S')
+									: (($mode & Fcntl::S_IXGRP()) ? 'x' : '-') ) .
 
-			( ($mode & S_IROTH) ? 'r' : '-' ) .
-			( ($mode & S_IWOTH) ? 'w' : '-' ) .
-			( ($mode & S_ISVTX) ? (($mode & S_IXOTH) ? 't' : 'T')
-								: (($mode & S_IXOTH) ? 'x' : '-') );
+		( ($mode & Fcntl::S_IROTH()) ? 'r' : '-' ) .
+		( ($mode & Fcntl::S_IWOTH()) ? 'w' : '-' ) .
+		( ($mode & Fcntl::S_ISVTX()) ? (($mode & Fcntl::S_IXOTH()) ? 't' : 'T')
+									: (($mode & Fcntl::S_IXOTH()) ? 'x' : '-') );
 }
 
 
@@ -454,16 +472,44 @@ sub file_mode {
 # Handle all Apache configuration directives
 #
 
+sub dump_apache_configuration {
+	my $r = shift;
+
+	my $rtn = '';
+	my %secs = ();
+	my $s = $r->server;
+	my $dir_cfg = get_config($s, $r->per_dir_config);
+	my $srv_cfg = get_config($s);
+  
+	if ($s->is_virtual) {
+		$secs{"1: Main Server"}  = get_config(Apache2::ServerUtil->server);
+		$secs{"2: Virtual Host"} = $srv_cfg;
+		$secs{"3: Location"}     = $dir_cfg;
+	} else {
+		$secs{"1: Main Server"}  = $srv_cfg;
+		$secs{"2: Location"}     = $dir_cfg;
+	}
+  
+	$rtn .= sprintf("Processing by %s.\n", 
+	$s->is_virtual ? "virtual host" : "main server");
+  
+	for my $sec (sort keys %secs) {
+		$rtn .= "\nSection $sec\n";
+		for my $k (sort keys %{ $secs{$sec}||{} }) {
+			my $v = exists $secs{$sec}->{$k}
+					? $secs{$sec}->{$k}
+					: 'UNSET';
+			$v = '[' . (join ", ", map {qq{"$_"}} @$v) . ']'
+				if ref($v) eq 'ARRAY';
+			$rtn .= sprintf("%-10s : %s\n", $k, $v);
+		}
+	}
+
+	return $rtn;
+}
+ 
 sub get_config {
 	Apache2::Module::get_config(__PACKAGE__, @_);
-}
-
-eval {
-	Apache2::Module::add(__PACKAGE__, [ map { { name => $_ } } @DIRECTIVES ]);
-};
-if ($@) {
-	warn $@;
-	print $@;
 }
 
 sub AddAlt            { push_val('AddAlt',            @_) }
