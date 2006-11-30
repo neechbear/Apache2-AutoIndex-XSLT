@@ -37,8 +37,10 @@ use Apache2::Const -compile => qw(:common :options :config DIR_MAGIC_TYPE);
 use Apache2::Directive qw();
 use Apache2::Log qw();
 use Apache2::Module qw();
+use Apache2::ServerRec qw();
 use Apache2::RequestRec qw();
 use Apache2::SubRequest qw();
+use Apache2::ServerUtil qw();
 use Apache2::URI qw();
 use Apache2::Util qw();
 
@@ -51,8 +53,9 @@ use Apache2::Util qw();
 # http://httpd.apache.org/docs/2.2/mod/mod_dir.html
 # http://www.modperl.com/book/chapters/ch8.html
 
-use vars qw($VERSION @DIRECTIVES);
+use vars qw($VERSION @DIRECTIVES %COUNTERS);
 $VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
+%COUNTERS = (Listings => 0, Files => 0, Directories => 0, Errors => 0);
 @DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
 	AddIconByEncoding AddIconByType DefaultIcon HeaderName IndexIgnore
 	IndexOptions IndexOrderDefault IndexStyleSheet ReadmeName DirectoryIndex
@@ -75,6 +78,41 @@ eval {
 sub handler {
 	my $r = shift;
 
+      my %secs = ();
+  
+      $r->content_type('text/plain');
+  
+      my $s = $r->server;
+      my $dir_cfg = get_config($s, $r->per_dir_config);
+      my $srv_cfg = get_config($s);
+  
+      if ($s->is_virtual) {
+          $secs{"1: Main Server"}  = get_config(Apache2::ServerUtil->server);
+          $secs{"2: Virtual Host"} = $srv_cfg;
+          $secs{"3: Location"}     = $dir_cfg;
+      }
+      else {
+          $secs{"1: Main Server"}  = $srv_cfg;
+          $secs{"2: Location"}     = $dir_cfg;
+       }
+  
+      $r->printf("Processing by %s.\n", 
+          $s->is_virtual ? "virtual host" : "main server");
+  
+      for my $sec (sort keys %secs) {
+          $r->print("\nSection $sec\n");
+          for my $k (sort keys %{ $secs{$sec}||{} }) {
+              my $v = exists $secs{$sec}->{$k}
+                  ? $secs{$sec}->{$k}
+                  : 'UNSET';
+              $v = '[' . (join ", ", map {qq{"$_"}} @$v) . ']'
+                  if ref($v) eq 'ARRAY';
+              $r->printf("%-10s : %s\n", $k, $v);
+          }
+      }
+  
+      return Apache2::Const::OK;
+
 	# Only handle directories
 	return Apache2::Const::DECLINED unless $r->content_type &&
 			$r->content_type eq Apache2::Const::DIR_MAGIC_TYPE;
@@ -93,12 +131,15 @@ sub handler {
 		$r->content_type('text/xml; charset="utf-8"');
 		return Apache2::Const::OK if $r->header_only;
 
-		# The _dir_xml subroutine will actually print and output
+		# The dir_xml subroutine will actually print and output
 		# all the XML DTD and XML, returning an OK if everything
 		# was successful.
 		my $rtn = Apache2::Const::SERVER_ERROR;
-		eval { $rtn = _dir_xml($r); };
-#		print $@ if $@;
+		eval { $rtn = dir_xml($r); };
+		if ($@) {
+			$COUNTERS{Errors}++;
+			warn $@, print $@;
+		};
 		return $rtn;
 
 	# Otherwise he's not the messiah, he's a very naughty boy
@@ -129,11 +170,26 @@ sub status {
 
 	my @status;
 	push @status, sprintf('<b>%s %s</b><br />', __PACKAGE__, $VERSION);
+	push @status, sprintf('<p><b>Configuration Directives:</b> %s</p>',
+			join(', ',@DIRECTIVES)
+		);
+
+	push @status, "<table>\n";
+	while (my ($k,$v) = each %COUNTERS) {
+		push @status, "<tr><th align=\"left\">$k:</th><td>$v</td></tr>\n";
+	}
+	push @status, "</table>\n";
+
 	eval {
 		require Data::Dumper;
-		my $cfg = Apache::ModuleConfig->get($r);
-		push @status, sprintf('<pre>%s</pre>', Dumper($cfg));
+		my $srv_cfg = get_config(Apache2::ServerUtil->server);
+		my $vrt_cfg = get_config($r->server);
+		my $dir_cfg = get_config($r->server, $r->per_dir_config);
+		push @status, sprintf('<b>srv_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($srv_cfg));
+		push @status, sprintf('<b>vrt_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($vrt_cfg));
+		push @status, sprintf('<b>dir_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($dir_cfg));
 	};
+	push @status, $@;
 
 	return \@status;
 }
@@ -151,8 +207,11 @@ sub status {
 # Private helper subroutines
 #
 
-sub _dir_xml {
+sub dir_xml {
 	my $r = shift;
+
+	# Increment listings counter
+	$COUNTERS{Listings}++;
 
 	# Get query string values
 	my $qstring = {};
@@ -182,24 +241,38 @@ sub _dir_xml {
 
 	# Send the XML header and top of the index tree
 	my $xslt = '/index.xslt';
-	_print_xml_header($r,$xslt);
+	print_xml_header($r,$xslt);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
-	_print_xml_options($r,$qstring);
+
+		require Data::Dumper;
+		my $srv_cfg = get_config(Apache2::ServerUtil->server);
+		my $vrt_cfg = get_config($r->server);
+		my $dir_cfg = get_config($r->server, $r->per_dir_config);
+		printf('<b>srv_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($srv_cfg));
+		printf('<b>vrt_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($vrt_cfg));
+		printf('<b>dir_cfg:</b> <pre>%s</pre>', Data::Dumper::Dumper($dir_cfg));
+
+	print_xml_options($r,$qstring);
 	print "\t<updir icon=\"/icons/__back.gif\" />\n" unless $r->uri =~ m,^/?$,;
 
 	# Build a list of attributes for each item in the directory and then
 	# print it as an element in the index tree.
 	while (my $id = readdir($dh)) {
 		next if $id =~ /^\./;
-		my $subr = $r->lookup_file($id); # Not used yet
+		#my $subr = $r->lookup_file($id); # Not used yet
+
 		my $filename = File::Spec->catfile($directory,$id);
-		my $type = _file_type($r,$id,$filename);
-		my $attr = _build_attributes($r,$id,$filename,$type);
+		my $type = file_type($r,$id,$filename);
+		my $attr = build_attributes($r,$id,$filename,$type);
+
 		printf("\t<%s %s />\n", $type, join(' ',
 					map { sprintf('%s="%s"',$_,$attr->{$_})
 							if defined $_ && defined $attr->{$_} }
 						keys(%{$attr})
 				));
+
+		$COUNTERS{Files}++ if $type eq 'file';
+		$COUNTERS{Directories}++ if $type eq 'dir';
 	}
 
 	# Close the index tree, directory handle and return
@@ -209,7 +282,7 @@ sub _dir_xml {
 }
 
 
-sub _print_xml_options {
+sub print_xml_options {
 	my ($r,$qstring) = @_;
 
 	my $format = "\t\t<option name=\"%s\" value=\"%s\" />\n";
@@ -229,11 +302,11 @@ sub _print_xml_options {
 }
 
 
-sub _build_attributes {
+sub build_attributes {
 	my ($r,$id,$filename,$type) = @_;
 	return {} if $type eq 'updir';
 
-	my $attr = _stat_file($r,$filename);
+	my $attr = stat_file($r,$filename);
 
 	if ($type eq 'file') {
 		($attr->{ext}) = $id =~ /\.([a-z0-9_]+)$/i;
@@ -259,13 +332,13 @@ sub _build_attributes {
 }
 
 
-sub _file_type {
+sub file_type {
 	my ($r,$id,$file) = @_;
 	return -d $file && $id eq '..' ? 'updir' : -d $file ? 'dir' : 'file';
 }
 
 
-sub _print_xml_header {
+sub print_xml_header {
 	my ($r,$xslt) = @_;
 
 	print qq{<?xml version="1.0"?>\n};
@@ -312,7 +385,7 @@ sub _print_xml_header {
 }
 
 
-sub _stat_file {
+sub stat_file {
 	my ($r,$filename) = @_;
 
 	my %stat;
@@ -321,7 +394,7 @@ sub _stat_file {
 
 	my %rtn;
 	$rtn{$_} = $stat{$_} for qw(uid gid mtime ctime size);
-	$rtn{perms} = _file_mode($stat{mode});
+	$rtn{perms} = file_mode($stat{mode});
 	$rtn{owner} = scalar getpwuid($rtn{uid});
 	$rtn{group} = scalar getgrgid($rtn{gid});
 
@@ -338,7 +411,7 @@ sub _stat_file {
 }
 
 
-sub _file_mode {
+sub file_mode {
 	my $mode = shift;
 
 	# This block of code is taken with thanks from
@@ -381,28 +454,91 @@ sub _file_mode {
 # Handle all Apache configuration directives
 #
 
-sub SERVER_CREATE {}
-sub DIR_CREATE {}
-sub SERVER_MERGE {}
-sub DIR_MERGE {}
+sub get_config {
+	Apache2::Module::get_config(__PACKAGE__, @_);
+}
 
-sub AddAlt {}
-sub AddAltByEncoding {}
-sub AddAltByType {}
-sub AddDescription {}
-sub AddIcon {}
-sub AddIconByEncoding {}
-sub AddIconByType {}
-sub DefaultIcon {}
-sub HeaderName {}
-sub IndexIgnore {}
-sub IndexOptions {}
-sub IndexOrderDefault {}
-sub IndexStyleSheet {}
-sub ReadmeName {}
-sub DirectoryIndex {}
-sub DirectorySlash {}
+eval {
+	Apache2::Module::add(__PACKAGE__, [ map { { name => $_ } } @DIRECTIVES ]);
+};
+if ($@) {
+	warn $@;
+	print $@;
+}
 
+sub AddAlt            { push_val('AddAlt',            @_) }
+sub AddAltByEncoding  { push_val('AddAltByEncoding',  @_) }
+sub AddAltByType      { push_val('AddAltByType',      @_) }
+sub AddDescription    { push_val('AddDescription',    @_) }
+sub AddIcon           { push_val('AddIcon',           @_) }
+sub AddIconByEncoding { push_val('AddIconByEncoding', @_) }
+sub AddIconByType     { push_val('AddIconByType',     @_) }
+sub IndexIgnore       { push_val('IndexIgnore',       @_) }
+sub IndexOptions      { push_val('IndexOptions',      @_) }
+sub DefaultIcon       { set_val('DefaultIcon',        @_) }
+sub HeaderName        { set_val('HeaderName',         @_) }
+sub IndexOrderDefault { set_val('IndexOrderDefault',  @_) }
+sub IndexStyleSheet   { set_val('IndexStyleSheet',    @_) }
+sub ReadmeName        { set_val('ReadmeName',         @_) }
+sub DirectoryIndex    { set_val('DirectoryIndex',     @_) }
+sub DirectorySlash    { set_val('DirectorySlash',     @_) }
+
+sub DIR_CREATE { defaults(@_) }
+sub SERVER_CREATE { defaults(@_) }
+sub SERVER_MERGE { merge(@_); }
+sub DIR_MERGE { merge(@_); }
+
+sub set_val {
+	my ($key, $self, $parms, $arg) = @_;
+	$self->{$key} = $arg;
+	unless ($parms->path) {
+		my $srv_cfg = Apache2::Module::get_config($self,
+		$parms->server);
+		$srv_cfg->{$key} = $arg;
+	}
+}
+  
+sub push_val {
+	my ($key, $self, $parms, $arg) = @_;
+	push @{ $self->{$key} }, $arg;
+	unless ($parms->path) {
+		my $srv_cfg = Apache2::Module::get_config($self,$parms->server);
+		push @{ $srv_cfg->{$key} }, $arg;
+	}
+}
+
+sub defaults {
+	my ($class, $parms) = @_;
+	return bless {
+			HeaderName => 'HEADER',
+			ReadmeName => 'FOOTER',
+			DirectoryIndex => 'index.html',
+			DefaultIcon => '/icons/__unknown.gif',
+		}, $class;
+}
+
+sub merge {
+	my ($base, $add) = @_;
+	my %mrg = ();
+	for my $key (keys %$base, keys %$add) {
+		next if exists $mrg{$key};
+		if ($key eq 'MyPlus') {
+			$mrg{$key} = ($base->{$key}||0) + ($add->{$key}||0);
+		} elsif ($key eq 'MyList') {
+			push @{ $mrg{$key} },
+			@{ $base->{$key}||[] }, @{ $add->{$key}||[] };
+		} elsif ($key eq 'MyAppend') {
+			$mrg{$key} = join " ", grep defined, $base->{$key},
+			$add->{$key};
+		} else {
+			# override mode
+			$mrg{$key} = $base->{$key} if exists $base->{$key};
+			$mrg{$key} = $add->{$key}  if exists $add->{$key};
+		}
+	}
+	return bless \%mrg, ref($base);
+}
+  
 1;
 
 

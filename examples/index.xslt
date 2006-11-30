@@ -10,6 +10,7 @@
 	<xsl:template match="/index">
 <html>
 	<head>
+		<!-- http://search.cpan.org/~nicolaw/Apache2-AutoIndex-XSLT -->
 		<meta name="robots" content="noarchive,nosnippet" />
 		<meta name="googlebot" content="noarchive,nosnippet" />
 		<title><xsl:value-of select="@path" /></title>
@@ -50,7 +51,6 @@
 	</head>
 	<body>
 			<div class="dhIndex">
-				
 				<xsl:for-each select="updir">
 				<a href="../">
 					<img width="16" height="16" alt="..">
@@ -60,7 +60,7 @@
 				<a href="../" onmouseover="window.status='Type: Directory'; return true" onmouseout="window.status='';return true">..<span>Type: Directory</span></a>
 				<br />
 				</xsl:for-each>
-						 
+
 				<xsl:for-each select="dir">
 
 				<a>
@@ -75,11 +75,11 @@
 					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
 					<xsl:attribute name="onmouseover">window.status='Type: Directory Date Modified: <xsl:value-of select="@mtime"/> Size: <xsl:value-of select="@size"/>'; return true</xsl:attribute>
 					<xsl:value-of select="@title" />
-							
+
 					<span>Type: Directory<br/>Date Modified: <xsl:value-of select="@mtime"/><br/>Size: <xsl:value-of select="@size"/></span>
 				</a>
 				<br />
-						
+
 				</xsl:for-each>
 
 				<!-- Now do all the files -->
@@ -97,16 +97,16 @@
 					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
 					<xsl:attribute name="onmouseover">window.status='Type: Directory Date Modified: <xsl:value-of select="@mtime"/> Size: <xsl:value-of select="@size"/>'; return true</xsl:attribute>
 					<xsl:value-of select="@title" />
-					
+
 					<span>Type: Directory<br/>Date Modified: <xsl:value-of select="@mtime"/><br/>Size: <xsl:value-of select="@size"/></span>
 				</a>
 				<br />
-					
+
 				</xsl:for-each>
 				
 			</div>
 	</body>
-</html>						
+</html>
 	</xsl:template>
 
 	<!-- Leave this in for now, might need it as an example later -->	
@@ -114,7 +114,7 @@
 	
 	<!--<xsl:template name="br-replace">
 		<xsl:param name="word"/>
-		
+
 		<xsl:variable name="cr">
 			<xsl:text>
 			</xsl:text>
@@ -132,5 +132,4 @@
 			</xsl:otherwise>
 		</xsl:choose>
 	</xsl:template>-->
-	
 </xsl:stylesheet>
