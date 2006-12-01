@@ -115,7 +115,7 @@ sub handler {
 
 	# Read in the filetypes information
 	if (!defined %FILETYPES && defined $dir_cfg->{FileTypesFilename}) {
-		for my $FileTypesFilename ($dir_cfg->{FileTypesFilename},
+		FileTypesFilename: for my $FileTypesFilename ($dir_cfg->{FileTypesFilename},
 				File::Spec->catfile($r->document_root,$dir_cfg->{FileTypesFilename}),
 				File::Spec->catfile(Apache2::ServerUtil->server_root,$dir_cfg->{FileTypesFilename})) {
 			my $ext = '';
