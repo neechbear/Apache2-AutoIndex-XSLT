@@ -6,7 +6,7 @@ use Data::Dumper;
 my %data;
 my $ext = '';
 while (local $_ = <>) {
-	if (my ($k,$v) = $_ =~ /^\s*(\S+)\s*:\s*(.+?)\s*$/) {
+	if (my ($k,$v) = $_ =~ /^\s*(\S+)\s*:\s*(\S.*?)\s*$/) {
 		if ($k =~ /ext(ension)?/i) {
 			$v =~ s/^\.//;
 			$ext = $v || '';
