@@ -70,7 +70,7 @@ use Apache2::URI qw(); # Needed for $r->construct_url
 # http://httpd.apache.org/docs/2.2/mod/mod_dir.html
 # http://www.modperl.com/book/chapters/ch8.html
 
-use vars qw($VERSION @DIRECTIVES %COUNTERS);
+use vars qw($VERSION @DIRECTIVES %COUNTERS %FILETYPES);
 $VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 %COUNTERS = (Listings => 0, Files => 0, Directories => 0, Errors => 0);
 @DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
@@ -85,6 +85,7 @@ eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__
 # Register our interesting in a bunch of Apache configuration directives
 eval { Apache2::Module::add(__PACKAGE__, [ map { { name => $_ } } @DIRECTIVES ]); };
 if ($@) { warn $@; print $@; }
+
 
 
 
@@ -107,6 +108,32 @@ sub handler {
 		$v = '' unless defined $v;
 		$qstring->{URI::Escape::uri_unescape($k)} =
 			URI::Escape::uri_unescape($v);
+	}
+
+	# Get the configuration directives
+	my $dir_cfg = get_config($r->server, $r->per_dir_config);
+
+	# Read in the filetypes information
+	if (!defined %FILETYPES && defined $dir_cfg->{FileTypesFilename}) {
+		for my $FileTypesFilename ($dir_cfg->{FileTypesFilename},
+				File::Spec->catfile($r->document_root,$dir_cfg->{FileTypesFilename}),
+				File::Spec->catfile(Apache2::ServerUtil->server_root,$dir_cfg->{FileTypesFilename})) {
+			my $ext = '';
+			if (open(FH,'<',$FileTypesFilename)) {
+				while (local $_ = <FH>) {
+					if (my ($k,$v) = $_ =~ /^\s*(\S+)\s*:\s*(\S.*?)\s*$/) {
+						if ($k =~ /ext(ension)?/i) {
+							$v =~ s/^\.//;
+							$ext = $v || '';
+						} elsif ($v) {
+							$FILETYPES{lc($ext)}->{$k} = $v;
+						}
+					}
+				}
+				close(FH);
+				last FileTypesFilename;
+			}
+		}
 	}
 
 	# Dump the configuration out to screen
@@ -138,7 +165,7 @@ sub handler {
 		# all the XML DTD and XML, returning an OK if everything
 		# was successful.
 		my $rtn = Apache2::Const::SERVER_ERROR;
-		eval { $rtn = dir_xml($r,$qstring); };
+		eval { $rtn = dir_xml($r,$dir_cfg,$qstring); };
 		if ($@) {
 			$COUNTERS{Errors}++;
 			warn $@, print $@;
@@ -203,7 +230,7 @@ sub status {
 #
 
 sub dir_xml {
-	my ($r,$qstring) = @_;
+	my ($r,$dir_cfg,$qstring) = @_;
 
 	# Increment listings counter
 	$COUNTERS{Listings}++;
@@ -223,9 +250,6 @@ sub dir_xml {
 			);
 		return Apache2::Const::FORBIDDEN;
 	}
-
-	# Get the configuration directives
-	my $dir_cfg = get_config($r->server, $r->per_dir_config);
 
 	# Send the XML header and top of the index tree
 	my $xslt = '/index.xslt';
@@ -313,7 +337,12 @@ sub build_attributes {
 		$attr->{href} = URI::Escape::uri_escape($id);
 		$attr->{href} .= '/' if $type eq 'dir';
 		$attr->{title} = $id;
-		#$attr->{desc} = '';
+		$attr->{desc} = $type eq 'dir' ? 'File Folder' : 'File';
+		if ($attr->{ext}) {
+			$attr->{desc} = exists $FILETYPES{lc($attr->{ext})} ?
+					$FILETYPES{lc($attr->{ext})}->{DisplayName} || '' : '';
+			$attr->{desc} ||= sprintf('%s File',uc($attr->{ext}));
+		}
 	}
 
 	return $attr;
@@ -530,6 +559,7 @@ sub IndexStyleSheet   { set_val('IndexStyleSheet',    @_) }
 sub ReadmeName        { set_val('ReadmeName',         @_) }
 sub DirectoryIndex    { set_val('DirectoryIndex',     @_) }
 sub DirectorySlash    { set_val('DirectorySlash',     @_) }
+sub FileTypesFilename { set_val('FileTypesFilename',  @_) }
 
 sub DIR_CREATE { defaults(@_) }
 sub SERVER_CREATE { defaults(@_) }
@@ -562,6 +592,8 @@ sub defaults {
 			ReadmeName => 'FOOTER',
 			DirectoryIndex => 'index.html',
 			DefaultIcon => '/icons/__unknown.gif',
+			IndexIgnore => [qw(index.xslt HEADER FOOTER filetypes.dat)],
+			FileTypesFilename => 'filetypes.dat',
 		}, $class;
 }
 
@@ -652,6 +684,8 @@ THIS IS A DEVELOPMENT RELEASE!
 =head2 IndexOrderDefault
 
 =head2 ReadmeName
+
+=head2 FileTypesFilename
 
 =head1 SEE ALSO
 
