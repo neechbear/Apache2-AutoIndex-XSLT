@@ -224,11 +224,14 @@ sub dir_xml {
 		return Apache2::Const::FORBIDDEN;
 	}
 
+	# Get the configuration directives
+	my $dir_cfg = get_config($r->server, $r->per_dir_config);
+
 	# Send the XML header and top of the index tree
 	my $xslt = '/index.xslt';
 	print_xml_header($r,$xslt);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
-	print_xml_options($r,$qstring);
+	print_xml_options($r,$qstring,$dir_cfg);
 	print "\t<updir icon=\"/icons/__back.gif\" />\n" unless $r->uri =~ m,^/?$,;
 
 	# Build a list of attributes for each item in the directory and then
@@ -239,7 +242,7 @@ sub dir_xml {
 
 		my $filename = File::Spec->catfile($directory,$id);
 		my $type = file_type($r,$id,$filename);
-		my $attr = build_attributes($r,$id,$filename,$type);
+		my $attr = build_attributes($r,$dir_cfg,$id,$filename,$type);
 
 		printf("\t<%s %s />\n", $type, join(' ',
 					map { sprintf("\n\t\t%s=\"%s\"",$_,$attr->{$_})
@@ -259,7 +262,7 @@ sub dir_xml {
 
 
 sub print_xml_options {
-	my ($r,$qstring) = @_;
+	my ($r,$qstring,$dir_cfg) = @_;
 
 	my $format = "\t\t<option name=\"%s\" value=\"%s\" />\n";
 	print "\t<options>\n";
@@ -272,13 +275,12 @@ sub print_xml_options {
 	}
 
 	# Apache configuration directives
-	my $cfg = get_config($r->server, $r->per_dir_config);
 	for my $d (@DIRECTIVES) {
 		for my $value ((
-			!exists($cfg->{$d}) ? ()
-								: ref($cfg->{$d}) eq 'ARRAY'
-								? $cfg->{$d}
-								: ($cfg->{$d})
+			!exists($dir_cfg->{$d}) ? ()
+								: ref($dir_cfg->{$d}) eq 'ARRAY'
+								? $dir_cfg->{$d}
+								: ($dir_cfg->{$d})
 				)) {
 			printf($format,$d,$value);
 		}
@@ -289,18 +291,18 @@ sub print_xml_options {
 
 
 sub build_attributes {
-	my ($r,$id,$filename,$type) = @_;
+	my ($r,$dir_cfg,$id,$filename,$type) = @_;
 	return {} if $type eq 'updir';
 
 	my $attr = stat_file($r,$filename);
 
 	if ($type eq 'file') {
 		($attr->{ext}) = $id =~ /\.([a-z0-9_]+)$/i;
-		$attr->{icon} = '/icons/__unknown.gif';
+		$attr->{icon} = $dir_cfg->{DefaultIcon} || '';
 		$attr->{icon} = $attr->{ext} &&
 			-f File::Spec->catfile($r->document_root,'icons',lc("$attr->{ext}.gif"))
 				? '/icons/'.lc("$attr->{ext}.gif")
-				: '/icons/__unknown.gif';
+				: $dir_cfg->{DefaultIcon} || '';
 	}
 
 	$attr->{icon} = '/icons/__dir.gif' if $type eq 'dir';
