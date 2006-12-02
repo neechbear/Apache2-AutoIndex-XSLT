@@ -303,7 +303,7 @@ sub print_xml_options {
 		for my $value ((
 			!exists($dir_cfg->{$d}) ? ()
 								: ref($dir_cfg->{$d}) eq 'ARRAY'
-								? $dir_cfg->{$d}
+								? @{$dir_cfg->{$d}}
 								: ($dir_cfg->{$d})
 				)) {
 			printf($format,$d,$value);

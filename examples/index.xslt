@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+ <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
 	<xsl:output encoding="iso-8859-1" method="html" indent="yes" doctype-public="-//W3C//DTD HTML 4.01 Transitional//EN"/>
 
 	<xsl:template name="nbsp">
@@ -12,7 +12,9 @@
 	<head>
 		<meta name="robots" content="noarchive,nosnippet" />
 		<meta name="googlebot" content="noarchive,nosnippet" />
-		<title><xsl:value-of select="@path" /></title>
+		<link rel="icon" href="/favicon.ico" type="image/x-icon" />
+		<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+		<title><xsl:value-of select="substring(@path,2)" /></title>
 		<style type="text/css">
 			body {
 				background-color: #ffffff;
@@ -36,35 +38,17 @@
 				padding-right: 4px;
 				padding-bottom: 1px;
 			}
-			table.dhIndex td, table.dhIndex div.inner {
+			table.dhIndex td, table.dhIndex div.inUp, table.dhIndex div.inDown {
 				font-weight: normal;
 				font-family: Tahoma, sans-serif;
 				font-size: 8pt;
 				text-align: left;
-			}
-			table.dhIndex div.outer {
-				height: 15px;
-				border-bottom: 1px #424142 solid;
-				border-right: 1px #424142 solid;
-				border-left: 1px #ffffff solid;
-				border-top: 1px #ffffff solid;
 			}
 			table.dhIndex td.filecol {
 				background: #F7F7F7;
 			}
 			table.dhIndex th.sizecol, table.dhIndex td.sizecol {
 				text-align: right;
-			}
-			table.dhIndex div.inner {
-				height: 13px;
-				padding-left: 4px;
-				padding-right: 4px;
-				color: #000000;
-				background: #D6D3CE;
-				border-bottom: 1px #848284 solid;
-				border-right: 1px #848284 solid;
-				border-left: 1px #D6D3CE solid;
-				border-top: 1px #D6D3CE solid; 
 			}
 
 			table.dhIndex img {
@@ -89,11 +73,11 @@
 				text-decoration: none;
 				white-space: nowrap;
 			}
-			table.dhIndex a:hover {
+			table.dhIndex td a:hover {
 				text-decoration: underline;
 			}
 
-			table.dhIndex a:hover span {
+			table.dhIndex td a:hover span {
 				background: #ffffe1;
 				border: 1px #000000 solid;
 				padding: 7px 7px 7px 7px;
@@ -112,18 +96,49 @@
 				-moz-opacity:0.5;
 				opacity: 0.5;
 			}
+
+			table.dhIndex div.outDown {
+				height: 15px;
+				border: 1px #848284 solid;
+			}
+			table.dhIndex div.inDown {
+				height: 13px;
+				padding-left: 4px;
+				padding-right: 4px;
+				color: #000000;
+				background: #D6D3CE;
+				border: 1px #D6D3CE solid; 
+			}
+			table.dhIndex div.outUp {
+				height: 15px;
+				border-bottom: 1px #424142 solid;
+				border-right: 1px #424142 solid;
+				border-left: 1px #ffffff solid;
+				border-top: 1px #ffffff solid;
+			}
+			table.dhIndex div.inUp {
+				height: 13px;
+				padding-left: 4px;
+				padding-right: 4px;
+				color: #000000;
+				background: #D6D3CE;
+				border-bottom: 1px #848284 solid;
+				border-right: 1px #848284 solid;
+				border-left: 1px #D6D3CE solid;
+				border-top: 1px #D6D3CE solid; 
+			}
 		</style>
 	</head>
 	<body>
 		<table cellspacing="0" cellpadding="0" border="0" width="100%" height="100%"
-				class="dhIndex" summary="Directory listing for">
+				class="dhIndex" summary="Directory listing">
 			<thead>
 				<tr>
-					<th scope="col" width="200" abbr="Name"><div class="outer"><div class="inner">Name</div></div></th>
-					<th scope="col" width="80" abbr="Size"><div class="outer"><div class="inner" style="text-align: right;">Size</div></div></th>
-					<th scope="col" width="150" abbr="Type"><div class="outer"><div class="inner">Type</div></div></th>
-					<th scope="col" width="150" abbr="Date Modified"><div class="outer"><div class="inner">Date Modified</div></div></th>
-					<th scope="col"><div class="outer"><div class="inner"></div></div></th>
+					<th scope="col" width="200" abbr="Name"><a href="?C=N;O=A"><div class="outUp"><div class="inUp">Name</div></div></a></th>
+					<th scope="col" width="80" abbr="Size"><a href="?C=S;O=A"><div class="outUp"><div class="inUp" style="text-align: right;">Size</div></div></a></th>
+					<th scope="col" width="150" abbr="Type"><a href="?C=D;O=A"><div class="outUp"><div class="inUp">Type</div></div></a></th>
+					<th scope="col" width="150" abbr="Date Modified"><a href="?C=M;O=A"><div class="outUp"><div class="inUp">Date Modified</div></div></a></th>
+					<th scope="col"><div class="outUp"><div class="inUp"></div></div></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -146,6 +161,8 @@
 
 			<!-- Do the directories first as is customary -->
 			<xsl:for-each select="dir">
+				<xsl:sort select="@title" />
+				<xsl:if test="@title!='icons'">
 				<tr>
 					<td class="filecol">
 						<a>
@@ -158,20 +175,24 @@
 						<!--<xsl:text disable-output-escaping="yes">&amp;nbsp;</xsl:text>-->
 						<a onmouseout="window.status='';return true">
 							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-							<xsl:attribute name="onmouseover">window.status='Type: Directory Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
+							<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="@desc"/> Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
 							<xsl:value-of select="@title" />
-							<span>Type: Directory<br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
+							<span>Type: <xsl:value-of select="@desc"/><br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
 						</a>
 					</td>
 					<td class="sizecol"></td>
-					<td>File Folder</td>
+					<td><xsl:value-of select="@desc"/></td>
 					<td><xsl:value-of select="@nicemtime"/></td>
 					<td></td>
 				</tr>
+				</xsl:if>
 			</xsl:for-each>
 
 			<!-- Now do all the files -->
 			<xsl:for-each select="file">
+				<xsl:sort select="@title" />
+<!-- <xsl:sort select="*[/index/options/option[@name='C']/@value]" order="ascending" /> -->
+				<xsl:if test="@title!='index.xslt'">
 				<tr>
 					<td class="filecol">
 						<a>
@@ -184,16 +205,17 @@
 						<!--<xsl:text disable-output-escaping="yes">&amp;nbsp;</xsl:text>-->
 						<a onmouseout="window.status='';return true">
 							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-							<xsl:attribute name="onmouseover">window.status='Type: Directory Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
+							<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="@desc"/> Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
 							<xsl:value-of select="@title" />
-							<span>Type: Directory<br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
+							<span>Type: <xsl:value-of select="@desc"/><br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
 						</a>
 					</td>
 					<td class="sizecol"><xsl:value-of select="@nicesize"/></td>
-					<td><xsl:value-of select="@ext"/> File</td>
+					<td><xsl:value-of select="@desc"/></td>
 					<td><xsl:value-of select="@nicemtime"/></td>
 					<td></td>
 				</tr>
+				</xsl:if>
 			</xsl:for-each>
 
 				<tr>
