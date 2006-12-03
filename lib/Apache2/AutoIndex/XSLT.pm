@@ -98,20 +98,12 @@ if ($@) { warn $@; print $@; }
 sub handler {
 	my $r = shift;
 
-	# Get query string values - use this manual code instead of
-	# Apache2::Request because it uses less memory, and Apache2::Request
-	# does not come as standard with mod_perl2 (it's libapreq2 on CPAN)
-	my $qstring = {};
-	for (split(/[&;]/,($r->args||''))) {
-		my ($k,$v) = split('=',$_,2);
-		next unless defined $k;
-		$v = '' unless defined $v;
-		$qstring->{URI::Escape::uri_unescape($k)} =
-			URI::Escape::uri_unescape($v);
-	}
+	# Only handle directories
+	return Apache2::Const::DECLINED unless $r->content_type &&
+			$r->content_type eq Apache2::Const::DIR_MAGIC_TYPE;
 
-	# Get the configuration directives
-	my $dir_cfg = get_config($r->server, $r->per_dir_config);
+	# Parse query string and get config
+	my ($qstring,$dir_cfg) = init_handler($r);
 
 	# Read in the filetypes information
 	if (!defined %FILETYPES && defined $dir_cfg->{FileTypesFilename}) {
@@ -142,10 +134,6 @@ sub handler {
 		print dump_apache_configuration($r);
 		return Apache2::Const::OK;
 	}
-
-	# Only handle directories
-	return Apache2::Const::DECLINED unless $r->content_type &&
-			$r->content_type eq Apache2::Const::DIR_MAGIC_TYPE;
 
 	# Make sure we're at a URL with a trailing slash
 	unless ($r->uri =~ m,/$,) {# || $r->path_info){
@@ -183,6 +171,27 @@ sub handler {
 }
 
 
+sub transhandler {
+	my $r = shift;
+
+	# Only handle directories
+	return Apache2::Const::DECLINED unless $r->uri =~ /\/$/;
+	return Apache2::Const::DECLINED unless $r->content_type &&
+			$r->content_type eq Apache2::Const::DIR_MAGIC_TYPE;
+
+	# Parse query string and get config
+	my ($qstring,$dir_cfg) = init_handler($r);
+
+	foreach (@{$dir_cfg->{indexfile}}){
+		my $subr = $r->lookup_uri($r->uri . $_);
+		last if $subr->path_info;
+		if (stat $subr->finfo){
+			$r->uri($subr->uri);
+			last;
+		}
+	}
+	return Apache2::Const::DECLINED;
+}
 
 
 
@@ -228,6 +237,27 @@ sub status {
 #
 # Private helper subroutines
 #
+
+sub init_handler {
+	my $r = shift;
+
+	# Get query string values - use this manual code instead of
+	# Apache2::Request because it uses less memory, and Apache2::Request
+	# does not come as standard with mod_perl2 (it's libapreq2 on CPAN)
+	my $qstring = {};
+	for (split(/[&;]/,($r->args||''))) {
+		my ($k,$v) = split('=',$_,2);
+		next unless defined $k;
+		$v = '' unless defined $v;
+		$qstring->{URI::Escape::uri_unescape($k)} =
+			URI::Escape::uri_unescape($v);
+	}
+
+	# Get the configuration directives
+	my $dir_cfg = get_config($r->server, $r->per_dir_config);
+
+	return ($qstring,$dir_cfg);
+}
 
 sub dir_xml {
 	my ($r,$dir_cfg,$qstring) = @_;
