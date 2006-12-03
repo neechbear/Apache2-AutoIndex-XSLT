@@ -2,3 +2,8 @@ perl Build.PL
 perl Build
 perl Build test
 perl Build install
+
+cp examples/index.xslt examples/favicon.ico {{root of your website}}
+cp -r examples/icons {{root of your website}}
+cp examples/filetypes.dat {{apache server root}}
+
