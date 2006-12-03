@@ -282,8 +282,7 @@ sub dir_xml {
 	}
 
 	# Send the XML header and top of the index tree
-	my $xslt = $dir_cfg->{IndexXSLT} || '/index.xslt';
-	print_xml_header($r,$xslt);
+	print_xml_header($r,$dir_cfg);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
 	print_xml_options($r,$qstring,$dir_cfg);
 	print "\t<updir icon=\"/icons/__back.gif\" />\n" unless $r->uri =~ m,^/?$,;
@@ -387,9 +386,13 @@ sub file_type {
 
 
 sub print_xml_header {
-	my ($r,$xslt) = @_;
+	my ($r,$dir_cfg) = @_;
+
+	my $css  = $dir_cfg->{IndexStyleSheet} || '';
+	my $xslt = $dir_cfg->{IndexXSLT} || '';
 
 	print qq{<?xml version="1.0"?>\n};
+	print qq{<?xml-stylesheet type="text/css" href="$css"?>\n} if $css;
 	print qq{<?xml-stylesheet type="text/xsl" href="$xslt"?>\n} if $xslt;
 	print qq{$_\n} for (
 			'<!DOCTYPE index [',
@@ -697,45 +700,108 @@ This module is designed as a drop in mod_perl2 replacement for the mod_dir and
 mod_index modules. It uses user configurable XSLT stylesheets to generate the
 directory listings.
 
-THIS IS A DEVELOPMENT RELEASE!
+THIS CODE IS INCOMPLETE -- THIS IS A DEVELOPMENT RELEASE!
 
 =head1 CONFIGURATION
 
+This module attempts to emulate as much as the functionality from the Apache
+mod_dir and mod_index modules as possible. Some of this is performed directly
+by the Apache::AutoIndex::XSLT module itself, and some through a combination
+of the I<options> elements presented in the output XML and the XSLT stylesheet.
+As a result, some of these configuration directives will do little or nothing
+at all if the XSLT stylesheet used does not use them.
+
 =head2 AddAlt
+
+     AddAlt "PDF file" *.pdf
+     AddAlt Compressed *.gz *.zip *.Z
+
+I<AddAlt> provides the alternate text to display for a file, instead of an
+icon, for I<FancyIndexing>. File is a file extension, partial filename,
+wild-card expression or full filename for files to describe. If String
+contains any whitespace, you have to enclose it in quotes (" or '). This
+alternate text is displayed if the client is image-incapable, has image
+loading disabled, or fails to retrieve the icon.
 
 =head2 AddAltByEncoding
 
+     AddAltByEncoding gzip x-gzip
+
+I<AddAltByEncoding> provides the alternate text to display for a file, instead
+of an icon, for I<FancyIndexing>. MIME-encoding is a valid content-encoding,
+such as x-compress. If String contains any whitespace, you have to enclose it
+in quotes (" or '). This alternate text is displayed if the client is
+image-incapable, has image loading disabled, or fails to retrieve the icon.
+
 =head2 AddAltByType
+
+     AddAltByType 'plain text' text/plain
+
+I<AddAltByType> sets the alternate text to display for a file, instead of an
+icon, for I<FancyIndexing>. MIME-type is a valid content-type, such as
+text/html. If String contains any whitespace, you have to enclose it in quotes
+(" or '). This alternate text is displayed if the client is image-incapable,
+has image loading disabled, or fails to retrieve the icon.
+
+=head2 AddDescription
+
+     AddDescription "The planet Mars" /web/pics/mars.gif
+
+This sets the description to display for a file, for I<FancyIndexing>. File is
+a file extension, partial filename, wild-card expression or full filename for
+files to describe. String is enclosed in double quotes (").
 
 =head2 AddIcon
 
+     AddIcon (IMG,/icons/image.xbm) .gif .jpg .xbm
+     AddIcon /icons/dir.xbm ^^DIRECTORY^^
+     AddIcon /icons/backup.xbm *~
+
+This sets the icon to display next to a file ending in name for
+I<FancyIndexing>. Icon is either a (%-escaped) relative URL to the icon, or of
+the format  (alttext,url) where alttext  is the text tag given for an icon for
+non-graphical browsers.
+
+Name is either ^^DIRECTORY^^ for directories, ^^BLANKICON^^ for blank lines
+(to format the list correctly), a file extension, a wildcard expression, a
+partial filename or a complete filename.
+
+I<AddIconByType> should be used in preference to I<AddIcon>, when possible.
+
 =head2 AddIconByEncoding
+
+     AddIconByEncoding /icons/compress.xbm x-compress
+
+This sets the icon to display next to files with I<FancyIndexing>. Icon is
+either a (%-escaped) relative URL to the icon, or of the format (alttext,url)
+where alttext is the text tag given for an icon for non-graphical browsers.
+
+MIME-encoding is a wildcard expression matching required the content-encoding.
 
 =head2 AddIconByType
 
+     AddIconByType (IMG,/icons/image.xbm) image/*
+
+This sets the icon to display next to files of type MIME-type for
+I<FancyIndexing>. Icon is either a (%-escaped) relative URL to the icon, or of
+the format (alttext,url)  where alttext is the text tag given for an icon for
+non-graphical browsers.
+
+MIME-type is a wildcard expression matching required the mime types.
+
 =head2 DefaultIcon
 
- DefaultIcon /icons/__unknown.gif
+     DefaultIcon /icons/__unknown.gif
 
 The I<DefaultIcon> directive sets the icon to display for files when no
 specific icon is known, for I<FancyIndexing>. Url-path is a (%-escaped)
 relative URL to the icon.
 
-=head2 DirectorySlash
-
-=head2 IndexStyleSheet
-
-=head2 AddDescription
-
-=head2 DirectoryIndex
-
-=head2 FancyIndexing
-
 =head2 HeaderName
 
 =head2 IndexIgnore
 
- IndexIgnore README .htindex *.bak *~
+     IndexIgnore README .htindex *.bak *~
 
 The I<IndexIgnore> directive adds to the list of files to hide when listing a
 directory. File is a shell-style wildcard expression or full filename. Multiple
@@ -744,25 +810,91 @@ of ignored files. By default, the list contains . (the current directory).
 
 =head2 IndexOptions
 
+     IndexOptions +DescriptionWidth=* +FancyIndexing +FoldersFirst +HTMLTable
+     IndexOptions +IconsAreLinks +IconHeight=16 +IconWidth=16 +IgnoreCase
+     IndexOptions +IgnoreClient +NameWidth=* +ScanHTMLTitles +ShowForbidden
+     IndexOptions +SuppressColumnSorting +SuppressDescription
+     IndexOptions +SuppressHTMLPreamble +SuppressIcon +SuppressLastModified
+     IndexOptions +SuppressRules +SuppressSize +TrackModified +VersionSort
+     IndexOptions +XHTML
+
+The I<IndexOptions> directive specifies the behavior of the directory indexing.
+
+See L<http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html#indexoptions>.
+
 =head2 IndexOrderDefault
+
+     IndexOrderDefault Ascending Name
+
+The I<IndexOrderDefault> directive is used in combination with the
+I<FancyIndexing> index option. By default, fancyindexed directory listings are
+displayed in ascending order by filename; the I<IndexOrderDefault> allows you
+to change this initial display order.
+
+I<IndexOrderDefault> takes two arguments. The first must be either Ascending or
+Descending, indicating the direction of the sort. The second argument must be
+one of the keywords Name, Date, Size, or Description, and identifies the
+primary key. The secondary key is always the ascending filename.
+
+You can force a directory listing to only be displayed in a particular order by
+combining this directive with the I<SuppressColumnSorting> index option; this
+will prevent the client from requesting the directory listing in a different
+order.
+
+=head2 IndexStyleSheet
+
+     IndexStyleSheet "/css/style.css" 
+
+The I<IndexStyleSheet> directive sets the name of the file that will be used as
+the CSS for the index listing. 
 
 =head2 ReadmeName
 
- ReadmeName FOOTER.html
+     ReadmeName FOOTER.html
 
 The I<ReadmeName> directive sets the name of the file that will be appended to
 the end of the index listing. Filename is the name of the file to include, and
 is taken to be relative to the location being indexed. If Filename begins with
 a slash, it will be taken to be relative to the I<DocumentRoot>.
 
+=head2 DirectoryIndex
+
+     DirectoryIndex index.html index.shtml
+
+The I<DirectoryIndex> directive sets the list of resources to look for, when
+the client requests an index of the directory by specifying a / at the end of
+the directory name. Local-url is the (%-encoded) URL of a document on the
+server relative to the requested directory; it is usually the name of a file
+in the directory. Several URLs may be given, in which case the server will
+return the first one that it finds. If none of the resources exist and the
+I<Indexes> option is set, the server will generate its own listing of the
+directory.
+
+=head2 DirectorySlash
+
+     DirectorySlash On
+
+The I<DirectorySlash> directive determines, whether or not to fixup URLs
+pointing to a directory or not. With this enabled (which is the default), if a
+user requests a resource without a trailing slash, which points to a directory,
+the user will be redirected to the same resource, but with trailing slash.
+
 =head2 IndexXSLT
 
- IndexXSLT /simple.xslt
+     IndexXSLT /simple.xslt
 
 The I<IndexXSLT> directive sets the name of the file that will be used as the
 XSLT for the index listing.
 
 =head2 FileTypesFilename
+
+=head1 XSLT STYLESHEET
+
+The XSLT stylesheet will default to I<index.xslt> in the DocumentRoot of the
+website. This can be changed using the I<IndexXSLT> directive. 
+
+An example I<index.xslt> file is bundled with this module in the I<examples/>
+directory.
 
 =head1 SEE ALSO
 
@@ -786,8 +918,13 @@ author something nice from her
 L<Amazon wishlist|http://www.amazon.co.uk/gp/registry/1VZXC59ESWYK0?sort=priority>? 
 ( http://www.amazon.co.uk/gp/registry/1VZXC59ESWYK0?sort=priority )
 
-With special thanks to Jennifer Beattie for developing the example XSLT
-stylesheets.
+With special thanks to Jennifer Beattie for helping develop the example XSLT
+stylesheets, and writing the I<examples/RegFileTypes.cs> "registered file type"
+data and icons extraction program for Windows.
+
+With special thanks to the authors of
+L<http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html> from which some
+documentation taken.
 
 =head1 COPYRIGHT
 

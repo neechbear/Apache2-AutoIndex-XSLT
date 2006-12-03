@@ -1,21 +1,40 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
- <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
-	<xsl:output encoding="iso-8859-1" method="html" indent="yes" doctype-public="-//W3C//DTD HTML 4.01 Transitional//EN"/>
+ <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="2.0">
+	<xsl:output encoding="iso-8859-1" method="html" indent="yes" doctype-public="-//W3C//DTD XHTML 1.0 Strict//EN" />
 
-	<xsl:template name="nbsp">
-		<xsl:text disable-output-escaping="yes">&amp;</xsl:text>
-		<xsl:text>nbsp;</xsl:text>
-	</xsl:template>
-
-	<xsl:template match="/index">
-<html>
+	<xsl:template match="/">
+<html xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns="http://www.w3.org/1999/xhtml" xsl:version="2.0">
 	<head>
+		<title>
+			<xsl:choose>
+				<xsl:when test="/index/@path='/'">My Computer</xsl:when>
+				<xsl:otherwise><xsl:value-of select="substring(/index/@path,2)" /></xsl:otherwise>
+			</xsl:choose>
+		</title>
+
 		<meta name="robots" content="noarchive,nosnippet" />
 		<meta name="googlebot" content="noarchive,nosnippet" />
+		<meta name="author" content="Nicola Worthington, nicolaw@cpan.org" />
+
 		<link rel="icon" href="/favicon.ico" type="image/x-icon" />
 		<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
-		<title><xsl:value-of select="substring(@path,2)" /></title>
+
+		<base><xsl:attribute name="href"><xsl:value-of select="/index/@href" /></xsl:attribute></base>
+
+		<script type="text/javascript">
+			// <![CDATA[
+			function toggle(element) {
+				if (element.style.display == 'none') {
+					element.style.display = 'block';
+				} else {
+					element.style.display = 'none';
+				}
+			}
+			// ]]>
+		</script>
+
 		<style type="text/css">
+			// <![CDATA[
 			body {
 				background-color: #ffffff;
 				margin: 0px 0px 0px 0px;
@@ -52,10 +71,7 @@
 			}
 
 			table.dhIndex img {
-				/* margin-bottom: 1px; */
-				/* margin-right: 4px; */
 				margin-right: 2px;
-				/* vertical-align: middle; */
 				vertical-align: bottom;
 				border: 0px;
 				width: 16px;
@@ -69,7 +85,6 @@
 			}
 			table.dhIndex a, table.dhIndex a:visited {
 				color: #000000;
-				/* background-color: #ffffff; */
 				text-decoration: none;
 				white-space: nowrap;
 			}
@@ -127,9 +142,10 @@
 				border-left: 1px #D6D3CE solid;
 				border-top: 1px #D6D3CE solid; 
 			}
+			// ]]>
 		</style>
 	</head>
-	<body>
+	<body style="margin: 0px 0px 0px 0px;">
 		<table cellspacing="0" cellpadding="0" border="0" width="100%" height="100%"
 				class="dhIndex" summary="Directory listing">
 			<thead>
@@ -142,7 +158,7 @@
 				</tr>
 			</thead>
 			<tbody>
-			<xsl:for-each select="updir">
+			<xsl:for-each select="/index/updir">
 				<tr>
 					<td class="filecol">
 						<a href="../">
@@ -159,64 +175,13 @@
 				</tr>
 			</xsl:for-each>
 
-			<!-- Do the directories first as is customary -->
-			<xsl:for-each select="dir">
-				<xsl:sort select="@title" />
-				<xsl:if test="@title!='icons'">
-				<tr>
-					<td class="filecol">
-						<a>
-							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-							<img width="16" height="16">
-								<xsl:attribute name="src"><xsl:value-of select="@icon"/></xsl:attribute>
-								<xsl:attribute name="alt"><xsl:value-of select="@title"/></xsl:attribute>
-							</img>
-						</a>  
-						<!--<xsl:text disable-output-escaping="yes">&amp;nbsp;</xsl:text>-->
-						<a onmouseout="window.status='';return true">
-							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-							<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="@desc"/> Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
-							<xsl:value-of select="@title" />
-							<span>Type: <xsl:value-of select="@desc"/><br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
-						</a>
-					</td>
-					<td class="sizecol"></td>
-					<td><xsl:value-of select="@desc"/></td>
-					<td><xsl:value-of select="@nicemtime"/></td>
-					<td></td>
-				</tr>
-				</xsl:if>
-			</xsl:for-each>
+			<xsl:apply-templates select="/index/dir">
+				<xsl:sort select="@title" order="ascending" />
+			</xsl:apply-templates>
 
-			<!-- Now do all the files -->
-			<xsl:for-each select="file">
-				<xsl:sort select="@title" />
-<!-- <xsl:sort select="*[/index/options/option[@name='C']/@value]" order="ascending" /> -->
-				<xsl:if test="@title!='index.xslt'">
-				<tr>
-					<td class="filecol">
-						<a>
-							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-							<img width="16" height="16">
-								<xsl:attribute name="src"><xsl:value-of select="@icon"/></xsl:attribute>
-								<xsl:attribute name="alt">[<xsl:value-of select="@ext"/>]</xsl:attribute>
-							</img>
-						</a>  
-						<!--<xsl:text disable-output-escaping="yes">&amp;nbsp;</xsl:text>-->
-						<a onmouseout="window.status='';return true">
-							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-							<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="@desc"/> Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
-							<xsl:value-of select="@title" />
-							<span>Type: <xsl:value-of select="@desc"/><br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
-						</a>
-					</td>
-					<td class="sizecol"><xsl:value-of select="@nicesize"/></td>
-					<td><xsl:value-of select="@desc"/></td>
-					<td><xsl:value-of select="@nicemtime"/></td>
-					<td></td>
-				</tr>
-				</xsl:if>
-			</xsl:for-each>
+			<xsl:apply-templates select="/index/file">
+				<xsl:sort select="@title" order="ascending" />
+			</xsl:apply-templates>
 
 				<tr>
 					<td height="100%" style="100%;" class="filecol"></td>
@@ -231,28 +196,72 @@
 </html>
 	</xsl:template>
 
-	<!-- Leave this in for now, might need it as an example later -->	
-	<!-- </xsl:text> on next line on purpose to get newline -->
-	
-	<!--<xsl:template name="br-replace">
-		<xsl:param name="word"/>
-		
-		<xsl:variable name="cr">
-			<xsl:text>
-			</xsl:text>
+	<xsl:template match="dir">
+		<xsl:variable name="title">
+			<xsl:choose>
+				<xsl:when test="/index/@path = '/' and @title = 'C:'"><xsl:text>IBM_PRELOAD (C:)</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'D:'"><xsl:text>Data (D:)</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>MSOFFICE11 (E:)</xsl:text></xsl:when>
+				<xsl:otherwise><xsl:value-of select="@title" /></xsl:otherwise>
+			</xsl:choose>
 		</xsl:variable>
-		<xsl:choose>
-			<xsl:when test="contains($word,$cr)">
-				<xsl:value-of select="substring-before($word,$cr)"/>
-				<br/>
-				<xsl:call-template name="br-replace">
-					<xsl:with-param name="word" select="substring-after($word,$cr)"/>
-				</xsl:call-template>
-			</xsl:when>
-			<xsl:otherwise>
-				<xsl:value-of select="$word"/>
-			</xsl:otherwise>
-		</xsl:choose>
-	</xsl:template>-->
-	
+		<xsl:variable name="icon">
+			<xsl:choose>
+				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>/icons/__dvd_drive.gif</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'C:' or @title = 'D:'"><xsl:text>/icons/__hard_disk_drive.gif</xsl:text></xsl:when>
+				<xsl:when test="@title = 'Logitech Webcam'"><xsl:text>/icons/__webcam.gif</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Documents'"><xsl:text>/icons/__my_documents.gif</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Pictures'"><xsl:text>/icons/__my_pictures.gif</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Videos'"><xsl:text>/icons/__my_videos.gif</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Music'"><xsl:text>/icons/__my_music.gif</xsl:text></xsl:when>
+				<xsl:otherwise><xsl:value-of select="@icon" /></xsl:otherwise>
+			</xsl:choose>
+		</xsl:variable>
+		<tr>
+			<td class="filecol">
+				<a>
+					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
+					<img width="16" height="16">
+						<xsl:attribute name="src"><xsl:value-of select="$icon" /></xsl:attribute>
+						<xsl:attribute name="alt">[<xsl:value-of select="@ext"/>]</xsl:attribute>
+					</img>
+				</a>  
+				<a onmouseout="window.status='';return true">
+					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
+					<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="@desc"/> Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
+					<xsl:value-of select="$title" />
+					<span>Type: <xsl:value-of select="@desc"/><br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
+				</a>
+			</td>
+			<td class="sizecol"></td>
+			<td><xsl:value-of select="@desc"/></td>
+			<td><xsl:value-of select="@nicemtime"/></td>
+			<td></td>
+		</tr>
+	</xsl:template>
+
+	<xsl:template match="file">
+		<tr>
+			<td class="filecol">
+				<a>
+					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
+					<img width="16" height="16">
+						<xsl:attribute name="src"><xsl:value-of select="@icon"/></xsl:attribute>
+						<xsl:attribute name="alt">[<xsl:value-of select="@ext"/>]</xsl:attribute>
+					</img>
+				</a>  
+				<a onmouseout="window.status='';return true">
+					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
+					<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="@desc"/> Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
+					<xsl:value-of select="@title" />
+					<span>Type: <xsl:value-of select="@desc"/><br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
+				</a>
+			</td>
+			<td class="sizecol"><xsl:value-of select="@nicesize"/></td>
+			<td><xsl:value-of select="@desc"/></td>
+			<td><xsl:value-of select="@nicemtime"/></td>
+			<td></td>
+		</tr>
+	</xsl:template>
+
 </xsl:stylesheet>
