@@ -76,7 +76,7 @@ $VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 @DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
 	AddIconByEncoding AddIconByType DefaultIcon HeaderName IndexIgnore
 	IndexOptions IndexOrderDefault IndexStyleSheet ReadmeName DirectoryIndex
-	DirectorySlash);
+	DirectorySlash IndexXSLT FileTypesFilesname);
 
 # Let Apache2::Status know we're here if it's hanging around
 eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
@@ -182,7 +182,7 @@ sub transhandler {
 	# Parse query string and get config
 	my ($qstring,$dir_cfg) = init_handler($r);
 
-	foreach (@{$dir_cfg->{indexfile}}){
+	foreach (@{$dir_cfg->{DirectoryIndex}}){
 		my $subr = $r->lookup_uri($r->uri . $_);
 		last if $subr->path_info;
 		if (stat $subr->finfo){
@@ -282,7 +282,7 @@ sub dir_xml {
 	}
 
 	# Send the XML header and top of the index tree
-	my $xslt = '/index.xslt';
+	my $xslt = $dir_cfg->{IndexXSLT} || '/index.xslt';
 	print_xml_header($r,$xslt);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
 	print_xml_options($r,$qstring,$dir_cfg);
@@ -291,8 +291,8 @@ sub dir_xml {
 	# Build a list of attributes for each item in the directory and then
 	# print it as an element in the index tree.
 	while (my $id = readdir($dh)) {
-		next if $id =~ /^\./;
-		next if grep($_ eq $id, @{$dir_cfg->{IndexIgnore}});
+		next if $id eq '..' || $id eq '.';
+		next if grep($id =~ /^$_$/, @{$dir_cfg->{IndexIgnoreRegex}});
 		#my $subr = $r->lookup_file($id); # Not used yet
 
 		my $filename = File::Spec->catfile($directory,$id);
@@ -440,6 +440,15 @@ sub print_xml_header {
 }
 
 
+sub glob2regex {
+	my $glob = shift || '';
+	$glob =~ s/\./\\./g; # . is a dot
+	$glob =~ s/\?/./g;   # ? is any single character
+	$glob =~ s/\*/.*/g;  # * means any number of any characters
+	return $glob;        # Now a regex
+}
+
+
 sub comify {
 	local $_ = shift;
 	s/^\s+|\s+$//g;
@@ -581,14 +590,18 @@ sub AddDescription    { push_val('AddDescription',    @_) }
 sub AddIcon           { push_val('AddIcon',           @_) }
 sub AddIconByEncoding { push_val('AddIconByEncoding', @_) }
 sub AddIconByType     { push_val('AddIconByType',     @_) }
-sub IndexIgnore       { push_val('IndexIgnore',       @_) }
+sub IndexIgnore       {
+			push_val( 'IndexIgnore', @_);
+			push_val( 'IndexIgnoreRegex', $_[0], $_[1], glob2regex($_[2]) );
+	}
 sub IndexOptions      { push_val('IndexOptions',      @_) }
+sub DirectoryIndex    { push_val('DirectoryIndex',    @_) }
 sub DefaultIcon       { set_val('DefaultIcon',        @_) }
 sub HeaderName        { set_val('HeaderName',         @_) }
 sub IndexOrderDefault { set_val('IndexOrderDefault',  @_) }
 sub IndexStyleSheet   { set_val('IndexStyleSheet',    @_) }
+sub IndexXSLT         { set_val('IndexXSLT',          @_) }
 sub ReadmeName        { set_val('ReadmeName',         @_) }
-sub DirectoryIndex    { set_val('DirectoryIndex',     @_) }
 sub DirectorySlash    { set_val('DirectorySlash',     @_) }
 sub FileTypesFilename { set_val('FileTypesFilename',  @_) }
 
@@ -621,11 +634,11 @@ sub defaults {
 	return bless {
 			HeaderName => 'HEADER',
 			ReadmeName => 'FOOTER',
-			DirectoryIndex => 'index.html',
+			DirectoryIndex => [qw(index.html index.shtml)],
+			IndexXSLT => '/index.xslt',
 			DefaultIcon => '/icons/__unknown.gif',
-			IndexIgnore => [qw(index.xslt robots.txt sitemap.gz
-								HEADER FOOTER filetypes.dat)],
-			FileTypesFilename => 'filetypes.dat',
+			IndexIgnore => [()],
+			FileTypesFilename => File::Spec->catfile(Apache2::ServerUtil->server_root,'filetypes.dat'),
 		}, $class;
 }
 
@@ -666,11 +679,16 @@ Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
 
 =head1 SYNOPSIS
 
- <Location />
+ PerlLoadModule Apache2::AutoIndex::XSLT
+ <Location>
      SetHandler perl-script
-     PerlLoadModule Apache2::AutoIndex::XSLT
      PerlResponseHandler Apache2::AutoIndex::XSLT
      Options +Indexes
+     DefaultIcon /icons/__unknown.gif
+     IndexIgnore .*
+     IndexIgnore index.xsl
+     IndexIgnore robots.txt
+     IndexIgnore sitemap.gz
  </Location>
 
 =head1 DESCRIPTION
@@ -697,6 +715,12 @@ THIS IS A DEVELOPMENT RELEASE!
 
 =head2 DefaultIcon
 
+ DefaultIcon /icons/__unknown.gif
+
+The I<DefaultIcon> directive sets the icon to display for files when no
+specific icon is known, for I<FancyIndexing>. Url-path is a (%-escaped)
+relative URL to the icon.
+
 =head2 DirectorySlash
 
 =head2 IndexStyleSheet
@@ -711,11 +735,32 @@ THIS IS A DEVELOPMENT RELEASE!
 
 =head2 IndexIgnore
 
+ IndexIgnore README .htindex *.bak *~
+
+The I<IndexIgnore> directive adds to the list of files to hide when listing a
+directory. File is a shell-style wildcard expression or full filename. Multiple
+I<IndexIgnore> directives add to the list, rather than the replacing the list
+of ignored files. By default, the list contains . (the current directory).
+
 =head2 IndexOptions
 
 =head2 IndexOrderDefault
 
 =head2 ReadmeName
+
+ ReadmeName FOOTER.html
+
+The I<ReadmeName> directive sets the name of the file that will be appended to
+the end of the index listing. Filename is the name of the file to include, and
+is taken to be relative to the location being indexed. If Filename begins with
+a slash, it will be taken to be relative to the I<DocumentRoot>.
+
+=head2 IndexXSLT
+
+ IndexXSLT /simple.xslt
+
+The I<IndexXSLT> directive sets the name of the file that will be used as the
+XSLT for the index listing.
 
 =head2 FileTypesFilename
 
@@ -723,7 +768,8 @@ THIS IS A DEVELOPMENT RELEASE!
 
 L<Apache::AutoIndex>,
 L<http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html>,
-L<http://httpd.apache.org/docs/2.2/mod/mod_dir.html>
+L<http://httpd.apache.org/docs/2.2/mod/mod_dir.html>,
+examples/*, L<http://bb-207-42-158-85.fallbr.tfb.net/>
 
 =head1 VERSION
 
