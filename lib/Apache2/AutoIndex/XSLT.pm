@@ -292,6 +292,7 @@ sub dir_xml {
 	# print it as an element in the index tree.
 	while (my $id = readdir($dh)) {
 		next if $id =~ /^\./;
+		next if grep($_ eq $id, @{$dir_cfg->{IndexIgnore}});
 		#my $subr = $r->lookup_file($id); # Not used yet
 
 		my $filename = File::Spec->catfile($directory,$id);
@@ -622,7 +623,8 @@ sub defaults {
 			ReadmeName => 'FOOTER',
 			DirectoryIndex => 'index.html',
 			DefaultIcon => '/icons/__unknown.gif',
-			IndexIgnore => [qw(index.xslt HEADER FOOTER filetypes.dat)],
+			IndexIgnore => [qw(index.xslt robots.txt sitemap.gz
+								HEADER FOOTER filetypes.dat)],
 			FileTypesFilename => 'filetypes.dat',
 		}, $class;
 }
