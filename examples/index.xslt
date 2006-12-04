@@ -8,6 +8,7 @@
 		<title>
 			<xsl:choose>
 				<xsl:when test="/index/@path='/'">My Computer</xsl:when>
+				<xsl:when test="/index/@path='/Logitech Webcam/'">My Computer: [Logitech Webcam]</xsl:when>
 				<xsl:otherwise><xsl:value-of select="substring(/index/@path,2)" /></xsl:otherwise>
 			</xsl:choose>
 		</title>
@@ -207,13 +208,13 @@
 		</xsl:variable>
 		<xsl:variable name="icon">
 			<xsl:choose>
-				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>/icons/__dvd_drive.gif</xsl:text></xsl:when>
-				<xsl:when test="/index/@path = '/' and @title = 'C:' or @title = 'D:'"><xsl:text>/icons/__hard_disk_drive.gif</xsl:text></xsl:when>
-				<xsl:when test="@title = 'Logitech Webcam'"><xsl:text>/icons/__webcam.gif</xsl:text></xsl:when>
-				<xsl:when test="@title = 'My Documents'"><xsl:text>/icons/__my_documents.gif</xsl:text></xsl:when>
-				<xsl:when test="@title = 'My Pictures'"><xsl:text>/icons/__my_pictures.gif</xsl:text></xsl:when>
-				<xsl:when test="@title = 'My Videos'"><xsl:text>/icons/__my_videos.gif</xsl:text></xsl:when>
-				<xsl:when test="@title = 'My Music'"><xsl:text>/icons/__my_music.gif</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>/icons/__dvd_drive.png</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'C:' or @title = 'D:'"><xsl:text>/icons/__hard_disk_drive.png</xsl:text></xsl:when>
+				<xsl:when test="@title = 'Logitech Webcam'"><xsl:text>/icons/__webcam.png</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Documents'"><xsl:text>/icons/__my_documents.png</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Pictures'"><xsl:text>/icons/__my_pictures.png</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Videos'"><xsl:text>/icons/__my_videos.png</xsl:text></xsl:when>
+				<xsl:when test="@title = 'My Music'"><xsl:text>/icons/__my_music.png</xsl:text></xsl:when>
 				<xsl:otherwise><xsl:value-of select="@icon" /></xsl:otherwise>
 			</xsl:choose>
 		</xsl:variable>
