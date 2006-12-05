@@ -233,6 +233,16 @@
 				<xsl:otherwise><xsl:value-of select="@desc" /></xsl:otherwise>
 			</xsl:choose>
 		</xsl:variable>
+		<xsl:variable name="nicesize">
+			<xsl:choose>
+				<xsl:when test="/index/@path = '/' and @title = 'C:'"><xsl:text>19 GB</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'D:'"><xsl:text>142 GB</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>401 MB</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'H:'"><xsl:text>752 GB</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'J:'"><xsl:text>752 GB</xsl:text></xsl:when>
+				<xsl:otherwise></xsl:otherwise>
+			</xsl:choose>
+		</xsl:variable>
 		<xsl:variable name="nicemtime">
 			<xsl:choose>
 				<xsl:when test="/index/@path = '/'"><xsl:text></xsl:text></xsl:when>
@@ -250,12 +260,12 @@
 				</a>  
 				<a onmouseout="window.status='';return true">
 					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-					<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="$desc"/> Date Modified: <xsl:value-of select="$nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
+					<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="$desc"/> Date Modified: <xsl:value-of select="$nicemtime"/> Size: <xsl:value-of select="$nicesize"/>'; return true</xsl:attribute>
 					<xsl:value-of select="$title" />
 					<span>Type: <xsl:value-of select="$desc"/><br/>Date Modified: <xsl:value-of select="$nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
 				</a>
 			</td>
-			<td class="sizecol"></td>
+			<td class="sizecol"><xsl:value-of select="$nicesize"/></td>
 			<td><xsl:value-of select="$desc"/></td>
 			<td><xsl:value-of select="$nicemtime"/></td>
 			<td></td>

@@ -285,7 +285,7 @@ sub dir_xml {
 	print_xml_header($r,$dir_cfg);
 	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
 	print_xml_options($r,$qstring,$dir_cfg);
-	print "\t<updir icon=\"/icons/__back.gif\" />\n" unless $r->uri =~ m,^/?$,;
+	print "\t<updir icon=\"/icons/__back.png\" />\n" unless $r->uri =~ m,^/?$,;
 
 	# Build a list of attributes for each item in the directory and then
 	# print it as an element in the index tree.
@@ -354,13 +354,13 @@ sub build_attributes {
 		($attr->{ext}) = $id =~ /\.([a-z0-9_]+)$/i;
 		$attr->{icon} = $dir_cfg->{DefaultIcon} || '';
 		$attr->{icon} = $attr->{ext} &&
-			-f File::Spec->catfile($r->document_root,'icons',lc("$attr->{ext}.gif"))
-				? '/icons/'.lc("$attr->{ext}.gif")
+			-f File::Spec->catfile($r->document_root,'icons',lc("$attr->{ext}.png"))
+				? '/icons/'.lc("$attr->{ext}.png")
 				: $dir_cfg->{DefaultIcon} || '';
 	}
 
-	$attr->{icon} = '/icons/__dir.gif' if $type eq 'dir';
-	$attr->{icon} = '/icons/__back.gif' if $type eq 'updir';
+	$attr->{icon} = '/icons/__dir.png' if $type eq 'dir';
+	$attr->{icon} = '/icons/__back.png' if $type eq 'updir';
 
 	unless ($type eq 'updir') {
 		#$attr->{id} = $id; # This serves no real purpose anymor
@@ -639,7 +639,7 @@ sub defaults {
 			ReadmeName => 'FOOTER',
 			DirectoryIndex => [qw(index.html index.shtml)],
 			IndexXSLT => '/index.xslt',
-			DefaultIcon => '/icons/__unknown.gif',
+			DefaultIcon => '/icons/__unknown.png',
 			IndexIgnore => [()],
 			FileTypesFilename => File::Spec->catfile(Apache2::ServerUtil->server_root,'filetypes.dat'),
 		}, $class;
@@ -687,7 +687,7 @@ Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
      SetHandler perl-script
      PerlResponseHandler Apache2::AutoIndex::XSLT
      Options +Indexes
-     DefaultIcon /icons/__unknown.gif
+     DefaultIcon /icons/__unknown.png
      IndexIgnore .*
      IndexIgnore index.xsl
      IndexIgnore robots.txt
@@ -745,7 +745,7 @@ has image loading disabled, or fails to retrieve the icon.
 
 =head2 AddDescription
 
-     AddDescription "The planet Mars" /web/pics/mars.gif
+     AddDescription "The planet Mars" /web/pics/mars.png
 
 This sets the description to display for a file, for I<FancyIndexing>. File is
 a file extension, partial filename, wild-card expression or full filename for
@@ -791,7 +791,7 @@ MIME-type is a wildcard expression matching required the mime types.
 
 =head2 DefaultIcon
 
-     DefaultIcon /icons/__unknown.gif
+     DefaultIcon /icons/__unknown.png
 
 The I<DefaultIcon> directive sets the icon to display for files when no
 specific icon is known, for I<FancyIndexing>. Url-path is a (%-escaped)
