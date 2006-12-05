@@ -200,22 +200,43 @@
 	<xsl:template match="dir">
 		<xsl:variable name="title">
 			<xsl:choose>
+				<xsl:when test="/index/@path = '/' and @title = 'A:'"><xsl:text>3&#189; Floppy (A:)</xsl:text></xsl:when>
 				<xsl:when test="/index/@path = '/' and @title = 'C:'"><xsl:text>IBM_PRELOAD (C:)</xsl:text></xsl:when>
 				<xsl:when test="/index/@path = '/' and @title = 'D:'"><xsl:text>Data (D:)</xsl:text></xsl:when>
 				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>MSOFFICE11 (E:)</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'H:'"><xsl:text>nworthin on Anatar (H:)</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'J:'"><xsl:text>XXX on Anatar (J:)</xsl:text></xsl:when>
 				<xsl:otherwise><xsl:value-of select="@title" /></xsl:otherwise>
 			</xsl:choose>
 		</xsl:variable>
 		<xsl:variable name="icon">
 			<xsl:choose>
-				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>/icons/__dvd_drive.png</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'A:' or @title = 'B:'"><xsl:text>/icons/__floppy_disk_drive.png</xsl:text></xsl:when>
 				<xsl:when test="/index/@path = '/' and @title = 'C:' or @title = 'D:'"><xsl:text>/icons/__hard_disk_drive.png</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>/icons/__dvd_drive.png</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and string-length(@title) = 2 and substring(@title,2,1) = ':'"><xsl:text>/icons/__network_drive.png</xsl:text></xsl:when>
 				<xsl:when test="@title = 'Logitech Webcam'"><xsl:text>/icons/__webcam.png</xsl:text></xsl:when>
 				<xsl:when test="@title = 'My Documents'"><xsl:text>/icons/__my_documents.png</xsl:text></xsl:when>
 				<xsl:when test="@title = 'My Pictures'"><xsl:text>/icons/__my_pictures.png</xsl:text></xsl:when>
 				<xsl:when test="@title = 'My Videos'"><xsl:text>/icons/__my_videos.png</xsl:text></xsl:when>
 				<xsl:when test="@title = 'My Music'"><xsl:text>/icons/__my_music.png</xsl:text></xsl:when>
 				<xsl:otherwise><xsl:value-of select="@icon" /></xsl:otherwise>
+			</xsl:choose>
+		</xsl:variable>
+		<xsl:variable name="desc">
+			<xsl:choose>
+				<xsl:when test="/index/@path = '/' and @title = 'A:' or @title = 'B:'"><xsl:text>3 1/2-Inch Floppy Disk</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'C:' or @title = 'D:'"><xsl:text>Local Disk</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'E:'"><xsl:text>DVD-RW Drive</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and @title = 'Logitech Webcam'"><xsl:text>Camera</xsl:text></xsl:when>
+				<xsl:when test="/index/@path = '/' and string-length(@title) = 2 and substring(@title,2,1) = ':'"><xsl:text>Network Drive</xsl:text></xsl:when>
+				<xsl:otherwise><xsl:value-of select="@desc" /></xsl:otherwise>
+			</xsl:choose>
+		</xsl:variable>
+		<xsl:variable name="nicemtime">
+			<xsl:choose>
+				<xsl:when test="/index/@path = '/'"><xsl:text></xsl:text></xsl:when>
+				<xsl:otherwise><xsl:value-of select="@nicemtime" /></xsl:otherwise>
 			</xsl:choose>
 		</xsl:variable>
 		<tr>
@@ -229,14 +250,14 @@
 				</a>  
 				<a onmouseout="window.status='';return true">
 					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
-					<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="@desc"/> Date Modified: <xsl:value-of select="@nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
+					<xsl:attribute name="onmouseover">window.status='Type: <xsl:value-of select="$desc"/> Date Modified: <xsl:value-of select="$nicemtime"/> Size: <xsl:value-of select="@nicesize"/>'; return true</xsl:attribute>
 					<xsl:value-of select="$title" />
-					<span>Type: <xsl:value-of select="@desc"/><br/>Date Modified: <xsl:value-of select="@nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
+					<span>Type: <xsl:value-of select="$desc"/><br/>Date Modified: <xsl:value-of select="$nicemtime"/><br/>Size: <xsl:value-of select="@nicesize"/></span>
 				</a>
 			</td>
 			<td class="sizecol"></td>
-			<td><xsl:value-of select="@desc"/></td>
-			<td><xsl:value-of select="@nicemtime"/></td>
+			<td><xsl:value-of select="$desc"/></td>
+			<td><xsl:value-of select="$nicemtime"/></td>
 			<td></td>
 		</tr>
 	</xsl:template>
