@@ -594,7 +594,7 @@ sub AddIcon           { push_val('AddIcon',           @_) }
 sub AddIconByEncoding { push_val('AddIconByEncoding', @_) }
 sub AddIconByType     { push_val('AddIconByType',     @_) }
 sub IndexIgnore       {
-			push_val( 'IndexIgnore', @_);
+			push_val( 'IndexIgnore', @_ );
 			push_val( 'IndexIgnoreRegex', $_[0], $_[1], glob2regex($_[2]) );
 	}
 sub IndexOptions      { push_val('IndexOptions',      @_) }
@@ -687,9 +687,10 @@ Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
      SetHandler perl-script
      PerlResponseHandler Apache2::AutoIndex::XSLT
      Options +Indexes
+     IndexXSLT /index.xslt
      DefaultIcon /icons/__unknown.png
      IndexIgnore .*
-     IndexIgnore index.xsl
+     IndexIgnore index.xslt
      IndexIgnore robots.txt
      IndexIgnore sitemap.gz
  </Location>
@@ -717,7 +718,7 @@ at all if the XSLT stylesheet used does not use them.
      AddAlt Compressed *.gz *.zip *.Z
 
 I<AddAlt> provides the alternate text to display for a file, instead of an
-icon, for I<FancyIndexing>. File is a file extension, partial filename,
+icon. File is a file extension, partial filename,
 wild-card expression or full filename for files to describe. If String
 contains any whitespace, you have to enclose it in quotes (" or '). This
 alternate text is displayed if the client is image-incapable, has image
@@ -728,7 +729,7 @@ loading disabled, or fails to retrieve the icon.
      AddAltByEncoding gzip x-gzip
 
 I<AddAltByEncoding> provides the alternate text to display for a file, instead
-of an icon, for I<FancyIndexing>. MIME-encoding is a valid content-encoding,
+of an icon. MIME-encoding is a valid content-encoding,
 such as x-compress. If String contains any whitespace, you have to enclose it
 in quotes (" or '). This alternate text is displayed if the client is
 image-incapable, has image loading disabled, or fails to retrieve the icon.
@@ -738,7 +739,7 @@ image-incapable, has image loading disabled, or fails to retrieve the icon.
      AddAltByType 'plain text' text/plain
 
 I<AddAltByType> sets the alternate text to display for a file, instead of an
-icon, for I<FancyIndexing>. MIME-type is a valid content-type, such as
+icon. MIME-type is a valid content-type, such as
 text/html. If String contains any whitespace, you have to enclose it in quotes
 (" or '). This alternate text is displayed if the client is image-incapable,
 has image loading disabled, or fails to retrieve the icon.
@@ -747,7 +748,7 @@ has image loading disabled, or fails to retrieve the icon.
 
      AddDescription "The planet Mars" /web/pics/mars.png
 
-This sets the description to display for a file, for I<FancyIndexing>. File is
+This sets the description to display for a file. File is
 a file extension, partial filename, wild-card expression or full filename for
 files to describe. String is enclosed in double quotes (").
 
@@ -757,8 +758,8 @@ files to describe. String is enclosed in double quotes (").
      AddIcon /icons/dir.xbm ^^DIRECTORY^^
      AddIcon /icons/backup.xbm *~
 
-This sets the icon to display next to a file ending in name for
-I<FancyIndexing>. Icon is either a (%-escaped) relative URL to the icon, or of
+This sets the icon to display next to a file ending in name. Icon is either a
+(%-escaped) relative URL to the icon, or of
 the format  (alttext,url) where alttext  is the text tag given for an icon for
 non-graphical browsers.
 
@@ -772,7 +773,7 @@ I<AddIconByType> should be used in preference to I<AddIcon>, when possible.
 
      AddIconByEncoding /icons/compress.xbm x-compress
 
-This sets the icon to display next to files with I<FancyIndexing>. Icon is
+This sets the icon to display next to files. Icon is
 either a (%-escaped) relative URL to the icon, or of the format (alttext,url)
 where alttext is the text tag given for an icon for non-graphical browsers.
 
@@ -782,8 +783,8 @@ MIME-encoding is a wildcard expression matching required the content-encoding.
 
      AddIconByType (IMG,/icons/image.xbm) image/*
 
-This sets the icon to display next to files of type MIME-type for
-I<FancyIndexing>. Icon is either a (%-escaped) relative URL to the icon, or of
+This sets the icon to display next to files of type MIME-type.
+Icon is either a (%-escaped) relative URL to the icon, or of
 the format (alttext,url)  where alttext is the text tag given for an icon for
 non-graphical browsers.
 
@@ -794,7 +795,7 @@ MIME-type is a wildcard expression matching required the mime types.
      DefaultIcon /icons/__unknown.png
 
 The I<DefaultIcon> directive sets the icon to display for files when no
-specific icon is known, for I<FancyIndexing>. Url-path is a (%-escaped)
+specific icon is known. Url-path is a (%-escaped)
 relative URL to the icon.
 
 =head2 HeaderName

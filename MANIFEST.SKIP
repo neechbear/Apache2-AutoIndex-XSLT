@@ -12,3 +12,5 @@
 CVS
 .svn
 ^DistBuild\.PL$
+examples/windows_example1.png
+examples/windows_example2.png
