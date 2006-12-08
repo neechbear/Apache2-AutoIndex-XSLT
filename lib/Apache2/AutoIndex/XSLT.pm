@@ -29,6 +29,7 @@ use warnings;
 
 use File::Spec qw();
 use Fcntl qw();
+use XML::Quote qw();
 use URI::Escape qw(); # Try to replace with Apache2::Util or Apache2::URI
 
 # This is libapreq2 - we're parsing the query string manually
@@ -36,8 +37,9 @@ use URI::Escape qw(); # Try to replace with Apache2::Util or Apache2::URI
 # use Apache2::Request qw(); 
 
 # These two are required in general
-use Apache2::ServerRec qw();
+use Apache2::ServerRec qw(); # $r->server
 use Apache2::RequestRec qw();
+use Apache2::RequestUtil qw(); # $r->document_root
 
 # Used to return various Apache constant response codes
 use Apache2::Const -compile => qw(:common :options :config DIR_MAGIC_TYPE);
@@ -55,9 +57,9 @@ use Apache2::ServerUtil qw();
 # Used for Apache2::Util::ht_time time formatting
 use Apache2::Util qw();
 
-use Apache2::URI qw(); # Needed for $r->construct_url
+use Apache2::URI qw(); # $r->construct_url
+use Apache2::Access qw(); # $r->allow_options
 
-#use Apache2::Access qw();     # Possibly not needed
 #use Apache2::Directive qw();  # Possibly not needed
 #use Apache2::SubRequest qw(); # Possibly not needed
 
@@ -366,12 +368,13 @@ sub build_attributes {
 		#$attr->{id} = $id; # This serves no real purpose anymor
 		$attr->{href} = URI::Escape::uri_escape($id);
 		$attr->{href} .= '/' if $type eq 'dir';
-		$attr->{title} = $id;
+		$attr->{title} = XML::Quote::xml_quote($id);
 		$attr->{desc} = $type eq 'dir' ? 'File Folder' : 'File';
 		if ($attr->{ext}) {
 			$attr->{desc} = exists $FILETYPES{lc($attr->{ext})} ?
 					$FILETYPES{lc($attr->{ext})}->{DisplayName} || '' : '';
 			$attr->{desc} ||= sprintf('%s File',uc($attr->{ext}));
+			$attr->{desc} = XML::Quote::xml_quote($attr->{desc});
 		}
 	}
 
@@ -448,6 +451,7 @@ sub glob2regex {
 	$glob =~ s/\./\\./g; # . is a dot
 	$glob =~ s/\?/./g;   # ? is any single character
 	$glob =~ s/\*/.*/g;  # * means any number of any characters
+	$glob =~ s/(?<!\\)([\(\)\[\]\+])/\\$1/g; # Escape metacharacters
 	return $glob;        # Now a regex
 }
 

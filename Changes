@@ -1,3 +1,16 @@
+Version 0.00_1 - 8th Devember 2006
+    + Added some modules to be loaded that were mistakenly
+      not loaded.
+    + Updated Build.PL to reflect all the modules that are
+      required.
+    + Added XML::Quote quoting of the XML output for some
+      attributes that may contain harmful characters.
+    + Added some more icons.
+    + Tweaked the index.xslt a little.
+    + Tweaked some of the examples/*
+    + Fixed the MANIFEST.SKIP so as not to ship unwanted
+      files in the final distribution tarball.
+
 Version 0.00 - 26th November 2006
     + Initial developer pre-release to save the namespace
       and to discuss API prior to full release.
