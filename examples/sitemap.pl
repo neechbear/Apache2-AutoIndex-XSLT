@@ -4,7 +4,7 @@ use strict;
 use File::Find qw();
 use POSIX qw(strftime);
 use WWW::Google::SiteMap qw();
-use WWW::Google::SiteMap::Ping qw();
+#use WWW::Google::SiteMap::Ping qw();
   
 chdir('/home/nicolaw/webroot/www/bb-207-42-158-85.fallbr.tfb.net/') || die $!;
 my $map = WWW::Google::SiteMap->new(file => 'sitemap.gz');
@@ -27,21 +27,21 @@ File::Find::find({wanted => sub {
 
 $map->write;
 
-my $ping = WWW::Google::SiteMap::Ping->new(
-		'http://bb-207-42-158-85.fallbr.tfb.net/sitemap.gz',
-	);
+#my $ping = WWW::Google::SiteMap::Ping->new(
+#		'http://bb-207-42-158-85.fallbr.tfb.net/sitemap.gz',
+#	);
 
-eval {
-	$ping->submit;
-	print "These pings succeeded:\n";
-	foreach($ping->success) {
-		print "$_: ".$ping->status($_)."\n";
-	}
-	print "These pings failed:\n";
-	foreach($ping->failure) {
-		print "$_: ".$ping->status($_)."\n";
-	}
-};
+#eval {
+#	$ping->submit;
+#	print "These pings succeeded:\n";
+#	foreach($ping->success) {
+#		print "$_: ".$ping->status($_)."\n";
+#	}
+#	print "These pings failed:\n";
+#	foreach($ping->failure) {
+#		print "$_: ".$ping->status($_)."\n";
+#	}
+#};
 
 exit;
 
