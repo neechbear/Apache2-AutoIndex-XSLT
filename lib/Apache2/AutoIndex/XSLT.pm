@@ -42,7 +42,9 @@ use Apache2::RequestRec qw();
 use Apache2::RequestUtil qw(); # $r->document_root
 
 # Used to return various Apache constant response codes
-use Apache2::Const -compile => qw(:common :options :config DIR_MAGIC_TYPE);
+use Apache2::Const -compile => qw(
+		:common :options :config :cmd_how :override :types
+	);
 
 # Used for writing to Apache logs
 use Apache2::Log qw();
@@ -72,21 +74,10 @@ use Apache2::Access qw(); # $r->allow_options
 # http://httpd.apache.org/docs/2.2/mod/mod_dir.html
 # http://www.modperl.com/book/chapters/ch8.html
 
-use vars qw($VERSION @DIRECTIVES %COUNTERS %FILETYPES);
+use vars qw($VERSION %DIRECTIVES %COUNTERS %FILETYPES);
 $VERSION = '0.00' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 %COUNTERS = (Listings => 0, Files => 0, Directories => 0, Errors => 0);
-@DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
-	AddIconByEncoding AddIconByType DefaultIcon HeaderName IndexIgnore
-	IndexOptions IndexOrderDefault IndexStyleSheet ReadmeName DirectoryIndex
-	DirectorySlash IndexXSLT FileTypesFilesname);
 
-# Let Apache2::Status know we're here if it's hanging around
-eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
-	\&status) if Apache2::Module::loaded('Apache2::Status'); };
-
-# Register our interesting in a bunch of Apache configuration directives
-eval { Apache2::Module::add(__PACKAGE__, [ map { { name => $_ } } @DIRECTIVES ]); };
-if ($@) { warn $@; print $@; }
 
 
 
@@ -206,13 +197,17 @@ sub transhandler {
 # Apache2::Status status page handler
 #
 
+# Let Apache2::Status know we're here if it's hanging around
+eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
+	\&status) if Apache2::Module::loaded('Apache2::Status'); };
+
 sub status {
 	my $r = shift;
 
 	my @status;
 	push @status, sprintf('<b>%s %s</b><br />', __PACKAGE__, $VERSION);
 	push @status, sprintf('<p><b>Configuration Directives:</b> %s</p>',
-			join(', ',@DIRECTIVES)
+			join(', ',keys %DIRECTIVES)
 		);
 
 	push @status, "<table>\n";
@@ -331,7 +326,7 @@ sub print_xml_options {
 	}
 
 	# Apache configuration directives
-	for my $d (@DIRECTIVES) {
+	for my $d (keys %DIRECTIVES) {
 		for my $value ((
 			!exists($dir_cfg->{$d}) ? ()
 								: ref($dir_cfg->{$d}) eq 'ARRAY'
@@ -480,12 +475,6 @@ sub stat_file {
 	$rtn{nicesize} = comify(sprintf('%d KB',
 						($rtn{size} + ($rtn{size} ? 1024 : 0))/1024
 					));
-#	eval {
-#		require Number::Format;
-#		my $format = new Number::Format;
-#		$rtn{nicesize} = $format->format_bytes($rtn{size},0).'B';
-#		$rtn{nicesize} =~ s/(\D+)$/ $1/;
-#	};
 
 	# Reformat times to this format: yyyy-mm-ddThh:mm-tz:tz
 	for (qw(mtime ctime)) {
@@ -548,7 +537,77 @@ sub file_mode {
 
 #
 # Handle all Apache configuration directives
+# http://perl.apache.org/docs/2.0/user/config/custom.html
 #
+
+#@DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
+#	AddIconByEncoding AddIconByType DefaultIcon HeaderName IndexIgnore
+#	IndexOptions IndexOrderDefault IndexStyleSheet ReadmeName DirectoryIndex
+#	DirectorySlash IndexXSLT FileTypesFilename);
+
+%DIRECTIVES = (
+	# http://search.cpan.org/~nicolaw/Apache2-AutoIndex-XSLT/lib/Apache2/AutoIndex/XSLT.pm
+		IndexXSLT  => {
+				name         => 'IndexXSLT',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE1,
+				errmsg       => 'IndexXSLT url-path',
+			},
+		FileTypesFilename => {
+				name         => 'FileTypesFilename',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE1,
+				errmsg       => 'FileTypesFilename file',
+			},
+
+	# http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html
+		AddAlt => {
+				name         => 'AddAlt',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE2,
+				errmsg       => 'AddAlt string file [file] ...',
+			},
+		AddAltByEncoding => {
+				name         => 'AddAltByEncoding',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE2,
+				errmsg       => 'AddAltByEncoding string MIME-encoding [MIME-encoding] ...',
+			},
+		AddAltByType       => Apache2::Const::ITERATE2,
+		AddIcon            => Apache2::Const::ITERATE2,
+		AddIconByEncoding  => Apache2::Const::ITERATE2,
+		AddIconByType      => Apache2::Const::ITERATE2,
+		DefaultIcon        => Apache2::Const::TAKE1,
+		HeaderName         => Apache2::Const::TAKE1,
+		IndexIgnore        => Apache2::Const::ITERATE,
+		IndexOptions       => Apache2::Const::ITERATE,
+		IndexOrderDefault  => Apache2::Const::TAKE2,
+		IndexStyleSheet    => Apache2::Const::TAKE1,
+		ReadmeName         => Apache2::Const::TAKE1,
+
+	# http://httpd.apache.org/docs/2.2/mod/mod_dir.html
+		DirectoryIndex     => Apache2::Const::ITERATE,
+		DirectorySlash     => Apache2::Const::FLAG,
+	);
+
+# Register our interest in a bunch of Apache configuration directives
+eval {
+	Apache2::Module::add(__PACKAGE__, [
+		map {
+			if (ref($DIRECTIVES{$_}) eq 'HASH') {
+				$DIRECTIVES{$_}
+			} else {
+				{
+				name         => $_,
+		#		func         => sprintf('%s::%s',__PACKAGE__, $_),
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE,
+		#		errmsg       => 'MyParameter Entry1 [Entry2 ... [EntryN]]',
+				}
+			}
+		} keys %DIRECTIVES
+	]);
+}; if ($@) { warn $@; print $@; }
 
 sub dump_apache_configuration {
 	my $r = shift;
@@ -570,18 +629,24 @@ sub dump_apache_configuration {
   
 	$rtn .= sprintf("Processing by %s.\n", 
 	$s->is_virtual ? "virtual host" : "main server");
+
+	require Data::Dumper;
+	local $Data::Dumper::Terse = 1;
+	local $Data::Dumper::Deepcopy = 1;
+	local $Data::Dumper::Sortkeys = 1;
+	$rtn = Data::Dumper::Dumper(\%secs);
   
-	for my $sec (sort keys %secs) {
-		$rtn .= "\nSection $sec\n";
-		for my $k (sort keys %{ $secs{$sec}||{} }) {
-			my $v = exists $secs{$sec}->{$k}
-					? $secs{$sec}->{$k}
-					: 'UNSET';
-			$v = '[' . (join ", ", map {qq{"$_"}} @$v) . ']'
-				if ref($v) eq 'ARRAY';
-			$rtn .= sprintf("%-10s : %s\n", $k, $v);
-		}
-	}
+#	for my $sec (sort keys %secs) {
+#		$rtn .= "\nSection $sec\n";
+#		for my $k (sort keys %{ $secs{$sec}||{} }) {
+#			my $v = exists $secs{$sec}->{$k}
+#					? $secs{$sec}->{$k}
+#					: 'UNSET';
+#			$v = '[' . (join ", ", map {qq{"$_"}} @$v) . ']'
+#				if ref($v) eq 'ARRAY';
+#			$rtn .= sprintf("%-10s : %s\n", $k, $v);
+#		}
+#	}
 
 	return $rtn;
 }
@@ -590,17 +655,38 @@ sub get_config {
 	Apache2::Module::get_config(__PACKAGE__, @_);
 }
 
-sub AddAlt            { push_val('AddAlt',            @_) }
+sub AddAlt {
+	push_val( 'AddAlt', $_[0], $_[1], join(' ',$_[2],$_[3]) );
+	push_val( 'AddAltRegex', $_[0], $_[1], 
+			[( $_[2],glob2regex($_[3]) )],
+		);
+}
+
 sub AddAltByEncoding  { push_val('AddAltByEncoding',  @_) }
 sub AddAltByType      { push_val('AddAltByType',      @_) }
 sub AddDescription    { push_val('AddDescription',    @_) }
-sub AddIcon           { push_val('AddIcon',           @_) }
+
+sub AddIcon           {
+	push_val( 'AddIcon', $_[0], $_[1], join(' ',$_[2],$_[3]) );
+	my $icon = $_[2];
+	my $alt = '';
+	if ($icon =~ /^\s*\(?(\S+?),(\S+?)\)\s*$/) {
+		$alt = $1;
+		$icon = $2;
+	}
+	push_val( 'AddIconRegex', $_[0], $_[1], 
+			[( $alt,$icon,glob2regex($_[3]) )],
+		);
+}
+
 sub AddIconByEncoding { push_val('AddIconByEncoding', @_) }
 sub AddIconByType     { push_val('AddIconByType',     @_) }
+
 sub IndexIgnore       {
-			push_val( 'IndexIgnore', @_ );
-			push_val( 'IndexIgnoreRegex', $_[0], $_[1], glob2regex($_[2]) );
-	}
+	push_val( 'IndexIgnore', @_ );
+	push_val( 'IndexIgnoreRegex', $_[0], $_[1], glob2regex($_[2]) );
+}
+
 sub IndexOptions      { push_val('IndexOptions',      @_) }
 sub DirectoryIndex    { push_val('DirectoryIndex',    @_) }
 sub DefaultIcon       { set_val('DefaultIcon',        @_) }
@@ -628,11 +714,11 @@ sub set_val {
 }
   
 sub push_val {
-	my ($key, $self, $parms, $arg) = @_;
-	push @{ $self->{$key} }, $arg;
+	my ($key, $self, $parms, @args) = @_;
+	push @{ $self->{$key} }, @args;
 	unless ($parms->path) {
 		my $srv_cfg = Apache2::Module::get_config($self,$parms->server);
-		push @{ $srv_cfg->{$key} }, $arg;
+		push @{ $srv_cfg->{$key} }, @args;
 	}
 }
 
