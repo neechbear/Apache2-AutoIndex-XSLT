@@ -42,9 +42,7 @@ use Apache2::RequestRec qw();
 use Apache2::RequestUtil qw(); # $r->document_root
 
 # Used to return various Apache constant response codes
-use Apache2::Const -compile => qw(
-		:common :options :config :cmd_how :override :types
-	);
+use Apache2::Const -compile => qw(:common :options :config :cmd_how :override :types);
 
 # Used for writing to Apache logs
 use Apache2::Log qw();
@@ -539,11 +537,6 @@ sub file_mode {
 # http://perl.apache.org/docs/2.0/user/config/custom.html
 #
 
-#@DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
-#	AddIconByEncoding AddIconByType DefaultIcon HeaderName IndexIgnore
-#	IndexOptions IndexOrderDefault IndexStyleSheet ReadmeName DirectoryIndex
-#	DirectorySlash FileTypesFilename);
-
 %DIRECTIVES = (
 	# http://search.cpan.org/~nicolaw/Apache2-AutoIndex-XSLT/lib/Apache2/AutoIndex/XSLT.pm
 		FileTypesFilename => {
@@ -660,15 +653,11 @@ eval {
 		map {
 			if (ref($DIRECTIVES{$_}) eq 'HASH') {
 				$DIRECTIVES{$_}
-			} else {
-				{
+			} else {{
 				name         => $_,
-		#		func         => sprintf('%s::%s',__PACKAGE__, $_),
 				req_override => Apache2::Const::OR_ALL,
 				args_how     => Apache2::Const::ITERATE,
-		#		errmsg       => 'MyParameter Entry1 [Entry2 ... [EntryN]]',
-				}
-			}
+			}}
 		} keys %DIRECTIVES
 	]);
 }; if ($@) { warn $@; print $@; }
@@ -699,18 +688,6 @@ sub dump_apache_configuration {
 	local $Data::Dumper::Deepcopy = 1;
 	local $Data::Dumper::Sortkeys = 1;
 	$rtn = Data::Dumper::Dumper(\%secs);
-  
-#	for my $sec (sort keys %secs) {
-#		$rtn .= "\nSection $sec\n";
-#		for my $k (sort keys %{ $secs{$sec}||{} }) {
-#			my $v = exists $secs{$sec}->{$k}
-#					? $secs{$sec}->{$k}
-#					: 'UNSET';
-#			$v = '[' . (join ", ", map {qq{"$_"}} @$v) . ']'
-#				if ref($v) eq 'ARRAY';
-#			$rtn .= sprintf("%-10s : %s\n", $k, $v);
-#		}
-#	}
 
 	return $rtn;
 }
@@ -720,35 +697,48 @@ sub get_config {
 }
 
 sub AddAlt {
-	push_val( 'AddAlt', $_[0], $_[1], join(' ',$_[2],$_[3]) );
-	push_val( 'AddAltRegex', $_[0], $_[1], 
-			[( $_[2],glob2regex($_[3]) )],
-		);
+	push_val('AddAlt', $_[0], $_[1], join(' ',$_[2],$_[3]));
+	push_val('AddAltRegex', $_[0], $_[1], [( $_[2],glob2regex($_[3]) )]);
 }
 
-sub AddAltByEncoding  { push_val('AddAltByEncoding',  @_) }
-sub AddAltByType      { push_val('AddAltByType',      @_) }
+sub AddAltByEncoding  {
+	push_val('AddAltByEncoding',  @_);
+	push_val('AddAltByEncodingRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+}
+
+sub AddAltByType {
+	push_val('AddAltByType', @_);
+	push_val('AddAltByTypeRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+}
+
 sub AddDescription    { push_val('AddDescription',    @_) }
 
-sub AddIcon           {
-	push_val( 'AddIcon', $_[0], $_[1], join(' ',$_[2],$_[3]) );
+sub AddIcon {
+	push_val('AddIcon', $_[0], $_[1], join(' ',$_[2],$_[3]));
 	my $icon = $_[2];
 	my $alt = '';
 	if ($icon =~ /^\s*\(?(\S+?),(\S+?)\)\s*$/) {
 		$alt = $1;
 		$icon = $2;
 	}
-	push_val( 'AddIconRegex', $_[0], $_[1], 
+	push_val('AddIconRegex', $_[0], $_[1], 
 			[( $alt,$icon,glob2regex($_[3]) )],
 		);
 }
 
-sub AddIconByEncoding { push_val('AddIconByEncoding', @_) }
-sub AddIconByType     { push_val('AddIconByType',     @_) }
+sub AddIconByEncoding {
+	push_val('AddIconByEncoding', @_);
+	push_val('AddIconByEncodingRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+}
 
-sub IndexIgnore       {
-	push_val( 'IndexIgnore', @_ );
-	push_val( 'IndexIgnoreRegex', $_[0], $_[1], glob2regex($_[2]) );
+sub AddIconByType {
+	push_val('AddIconByType', @_);
+	push_val('AddIconByTypeRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+}
+
+sub IndexIgnore {
+	push_val('IndexIgnore', @_);
+	push_val('IndexIgnoreRegex', $_[0], $_[1], glob2regex($_[2]));
 }
 
 sub IndexOptions      { push_val('IndexOptions',      @_) }
