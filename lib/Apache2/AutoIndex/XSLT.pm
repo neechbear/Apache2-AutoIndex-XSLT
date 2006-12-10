@@ -386,12 +386,11 @@ sub file_type {
 sub print_xml_header {
 	my ($r,$dir_cfg) = @_;
 
-	my $css  = $dir_cfg->{IndexStyleSheet} || '';
-	my $xslt = $dir_cfg->{IndexXSLT} || '';
+	my $xslt = $dir_cfg->{IndexStyleSheet} || '';
+	my $type = $xslt =~ /\.css/ ? 'text/css' : 'text/xsl';
 
 	print qq{<?xml version="1.0"?>\n};
-	print qq{<?xml-stylesheet type="text/css" href="$css"?>\n} if $css;
-	print qq{<?xml-stylesheet type="text/xsl" href="$xslt"?>\n} if $xslt;
+	print qq{<?xml-stylesheet type="$type" href="$xslt"?>\n} if $xslt;
 	print qq{$_\n} for (
 			'<!DOCTYPE index [',
 			'  <!ELEMENT index (options?, updir?, (file | dir)*)>',
@@ -543,16 +542,10 @@ sub file_mode {
 #@DIRECTIVES = qw(AddAlt AddAltByEncoding AddAltByType AddDescription AddIcon
 #	AddIconByEncoding AddIconByType DefaultIcon HeaderName IndexIgnore
 #	IndexOptions IndexOrderDefault IndexStyleSheet ReadmeName DirectoryIndex
-#	DirectorySlash IndexXSLT FileTypesFilename);
+#	DirectorySlash FileTypesFilename);
 
 %DIRECTIVES = (
 	# http://search.cpan.org/~nicolaw/Apache2-AutoIndex-XSLT/lib/Apache2/AutoIndex/XSLT.pm
-		IndexXSLT  => {
-				name         => 'IndexXSLT',
-				req_override => Apache2::Const::OR_ALL,
-				args_how     => Apache2::Const::TAKE1,
-				errmsg       => 'IndexXSLT url-path',
-			},
 		FileTypesFilename => {
 				name         => 'FileTypesFilename',
 				req_override => Apache2::Const::OR_ALL,
@@ -573,21 +566,92 @@ sub file_mode {
 				args_how     => Apache2::Const::ITERATE2,
 				errmsg       => 'AddAltByEncoding string MIME-encoding [MIME-encoding] ...',
 			},
-		AddAltByType       => Apache2::Const::ITERATE2,
-		AddIcon            => Apache2::Const::ITERATE2,
-		AddIconByEncoding  => Apache2::Const::ITERATE2,
-		AddIconByType      => Apache2::Const::ITERATE2,
-		DefaultIcon        => Apache2::Const::TAKE1,
-		HeaderName         => Apache2::Const::TAKE1,
-		IndexIgnore        => Apache2::Const::ITERATE,
-		IndexOptions       => Apache2::Const::ITERATE,
-		IndexOrderDefault  => Apache2::Const::TAKE2,
-		IndexStyleSheet    => Apache2::Const::TAKE1,
-		ReadmeName         => Apache2::Const::TAKE1,
+		AddAltByType => {
+				name         => 'AddAltByType',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE2,
+				errmsg       => 'AddAltByType string MIME-type [MIME-type] ...',
+			},
+		AddDescription => {
+				name         => 'AddDescription',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE2,
+				errmsg       => 'AddDescription string file [file] ...',
+			},
+		AddIcon => {
+				name         => 'AddIcon',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE2,
+				errmsg       => 'AddIcon icon name [name] ...',
+			},
+		AddIconByEncoding => {
+				name         => 'AddIconByEncoding',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE2,
+				errmsg       => 'AddIconByEncoding icon MIME-encoding [MIME-encoding] ...',
+			},
+		AddIconByType => {
+				name         => 'AddIconByType',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE2,
+				errmsg       => 'AddIconByType icon MIME-type [MIME-type] ...',
+			},
+		DefaultIcon => {
+				name         => 'DefaultIcon',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE1,
+				errmsg       => 'DefaultIcon url-path',
+			},
+		HeaderName => {
+				name         => 'HeaderName',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE1,
+				errmsg       => 'HeaderName filename',
+			},
+		IndexIgnore => {
+				name         => 'IndexIgnore',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE,
+				errmsg       => 'IndexIgnore file [file] ...',
+			},
+		IndexOptions => {
+				name         => 'IndexOptions',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE,
+				errmsg       => 'IndexOptions [+|-]option [[+|-]option] ...',
+			},
+		IndexOrderDefault => {
+				name         => 'IndexOrderDefault',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE2,
+				errmsg       => 'IndexOrderDefault Ascending|Descending Name|Date|Size|Description',
+			},
+		IndexStyleSheet => {
+				name         => 'IndexStyleSheet',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE1,
+				errmsg       => 'IndexStyleSheet url-path',
+			},
+		ReadmeName => {
+				name         => 'ReadmeName',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE1,
+				errmsg       => 'ReadmeName filename',
+			},
 
 	# http://httpd.apache.org/docs/2.2/mod/mod_dir.html
-		DirectoryIndex     => Apache2::Const::ITERATE,
-		DirectorySlash     => Apache2::Const::FLAG,
+		DirectoryIndex => {
+				name         => 'DirectoryIndex',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::ITERATE,
+				errmsg       => 'DirectoryIndex local-url [local-url] ...',
+			},
+		DirectorySlash => {
+				name         => 'DirectorySlash',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::FLAG,
+				errmsg       => 'DirectorySlash On|Off',
+			},
 	);
 
 # Register our interest in a bunch of Apache configuration directives
@@ -693,7 +757,6 @@ sub DefaultIcon       { set_val('DefaultIcon',        @_) }
 sub HeaderName        { set_val('HeaderName',         @_) }
 sub IndexOrderDefault { set_val('IndexOrderDefault',  @_) }
 sub IndexStyleSheet   { set_val('IndexStyleSheet',    @_) }
-sub IndexXSLT         { set_val('IndexXSLT',          @_) }
 sub ReadmeName        { set_val('ReadmeName',         @_) }
 sub DirectorySlash    { set_val('DirectorySlash',     @_) }
 sub FileTypesFilename { set_val('FileTypesFilename',  @_) }
@@ -728,7 +791,7 @@ sub defaults {
 			HeaderName => 'HEADER',
 			ReadmeName => 'FOOTER',
 			DirectoryIndex => [qw(index.html index.shtml)],
-			IndexXSLT => '/index.xslt',
+			IndexStyleSheet => '/index.xslt',
 			DefaultIcon => '/icons/__unknown.png',
 			IndexIgnore => [()],
 			FileTypesFilename => File::Spec->catfile(Apache2::ServerUtil->server_root,'filetypes.dat'),
@@ -777,7 +840,7 @@ Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
      SetHandler perl-script
      PerlResponseHandler Apache2::AutoIndex::XSLT
      Options +Indexes
-     IndexXSLT /index.xslt
+     IndexStyleSheet /index.xslt
      DefaultIcon /icons/__unknown.png
      IndexIgnore .*
      IndexIgnore index.xslt
@@ -970,19 +1033,12 @@ pointing to a directory or not. With this enabled (which is the default), if a
 user requests a resource without a trailing slash, which points to a directory,
 the user will be redirected to the same resource, but with trailing slash.
 
-=head2 IndexXSLT
-
-     IndexXSLT /simple.xslt
-
-The I<IndexXSLT> directive sets the name of the file that will be used as the
-XSLT for the index listing.
-
 =head2 FileTypesFilename
 
 =head1 XSLT STYLESHEET
 
 The XSLT stylesheet will default to I<index.xslt> in the DocumentRoot of the
-website. This can be changed using the I<IndexXSLT> directive. 
+website. This can be changed using the I<IndexStyleSheet> directive. 
 
 An example I<index.xslt> file is bundled with this module in the I<examples/>
 directory.
