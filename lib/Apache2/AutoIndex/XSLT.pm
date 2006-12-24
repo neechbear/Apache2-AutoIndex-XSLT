@@ -830,7 +830,7 @@ Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
 =head1 SYNOPSIS
 
  PerlLoadModule Apache2::AutoIndex::XSLT
- <Location>
+ <Location />
      SetHandler perl-script
      PerlResponseHandler Apache2::AutoIndex::XSLT
      Options +Indexes
