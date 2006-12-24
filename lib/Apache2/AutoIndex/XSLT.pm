@@ -130,7 +130,7 @@ sub handler {
 	}
 
 	# Make sure we're at a URL with a trailing slash
-	unless ($r->uri =~ m,/$,) {# || $r->path_info){
+	if ($dir_cfg->{DirectorySlash} && $r->uri !~ m,/$,) {# || $r->path_info){
 		$r->headers_out->add(Location => sprintf('%s/%s',
 				$r->uri,
 				($r->args ? '?'.$r->args : '')
@@ -199,8 +199,10 @@ sub transhandler {
 #
 
 # Let Apache2::Status know we're here if it's hanging around
-eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
-	\&status) if Apache2::Module::loaded('Apache2::Status'); };
+unless (exists $ENV{AUTOMATED_TESTING}) {
+	eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
+		\&status) if Apache2::Module::loaded('Apache2::Status'); };
+}
 
 sub status {
 	my $r = shift;
@@ -256,6 +258,7 @@ sub init_handler {
 
 	return ($qstring,$dir_cfg);
 }
+
 
 sub dir_xml {
 	my ($r,$dir_cfg,$qstring) = @_;
@@ -334,11 +337,32 @@ sub print_xml_options {
 								? @{$dir_cfg->{$d}}
 								: ($dir_cfg->{$d})
 				)) {
-			printf($format,$d,$value);
+			# Don't bother printing stuff that we only have
+			# some confusing internal complex data structure for
+			printf($format,$d,$value) unless ref($value);
 		}
 	}
 
 	print "\t</options>\n";
+}
+
+
+sub icon_by_extension {
+	my ($r,$id,$ext,$dir_cfg) = @_;
+
+	my $alt = '';
+	my $icon =
+		$ext && -f File::Spec->catfile($r->document_root,'icons',lc("$ext.png")) 
+			? '/icons/'.lc("$ext.png")
+			: $dir_cfg->{DefaultIcon} || '';
+
+	while (my ($re,$v) = each %{$dir_cfg->{AddIconRegex}}) {
+		if ($id =~ /$re$/) {
+			($alt,$icon) = @{$v};
+		}
+	}
+
+	return ($alt,$icon);
 }
 
 
@@ -350,15 +374,19 @@ sub build_attributes {
 
 	if ($type eq 'file') {
 		($attr->{ext}) = $id =~ /\.([a-z0-9_]+)$/i;
-		$attr->{icon} = $dir_cfg->{DefaultIcon} || '';
-		$attr->{icon} = $attr->{ext} &&
-			-f File::Spec->catfile($r->document_root,'icons',lc("$attr->{ext}.png"))
-				? '/icons/'.lc("$attr->{ext}.png")
-				: $dir_cfg->{DefaultIcon} || '';
-	}
+		($attr->{alt},$attr->{icon}) = icon_by_extension($r,$id,$attr->{ext},$dir_cfg);
 
-	$attr->{icon} = '/icons/__dir.png' if $type eq 'dir';
-	$attr->{icon} = '/icons/__back.png' if $type eq 'updir';
+	} elsif ($type eq 'dir') {
+		$attr->{alt} = 'DIR';
+		$attr->{icon} = '/icons/__dir.png';
+		if ($dir_cfg->{AddIconRegex}->{'^^DIRECTORY^^'}) {
+			($attr->{alt},$attr->{icon}) =
+				@{$dir_cfg->{AddIconRegex}->{'^^DIRECTORY^^'}};
+		}
+
+	} elsif ($type eq 'updir') {
+		$attr->{icon} = '/icons/__back.png';
+	}
 
 	unless ($type eq 'updir') {
 		#$attr->{id} = $id; # This serves no real purpose anymor
@@ -513,17 +541,17 @@ sub file_mode {
 		( ($mode & Fcntl::S_IRUSR()) ? 'r' : '-' ) .
 		( ($mode & Fcntl::S_IWUSR()) ? 'w' : '-' ) .
 		( ($mode & Fcntl::S_ISUID()) ? (($mode & Fcntl::S_IXUSR()) ? 's' : 'S')
-									: (($mode & Fcntl::S_IXUSR()) ? 'x' : '-') ) .
+									 : (($mode & Fcntl::S_IXUSR()) ? 'x' : '-') ) .
 
 		( ($mode & Fcntl::S_IRGRP()) ? 'r' : '-' ) .
 		( ($mode & Fcntl::S_IWGRP()) ? 'w' : '-' ) .
 		( ($mode & Fcntl::S_ISGID()) ? (($mode & Fcntl::S_IXGRP()) ? 's' : 'S')
-									: (($mode & Fcntl::S_IXGRP()) ? 'x' : '-') ) .
+									 : (($mode & Fcntl::S_IXGRP()) ? 'x' : '-') ) .
 
 		( ($mode & Fcntl::S_IROTH()) ? 'r' : '-' ) .
 		( ($mode & Fcntl::S_IWOTH()) ? 'w' : '-' ) .
 		( ($mode & Fcntl::S_ISVTX()) ? (($mode & Fcntl::S_IXOTH()) ? 't' : 'T')
-									: (($mode & Fcntl::S_IXOTH()) ? 'x' : '-') );
+									 : (($mode & Fcntl::S_IXOTH()) ? 'x' : '-') );
 }
 
 
@@ -651,19 +679,22 @@ sub file_mode {
 	);
 
 # Register our interest in a bunch of Apache configuration directives
-eval {
-	Apache2::Module::add(__PACKAGE__, [
-		map {
-			if (ref($DIRECTIVES{$_}) eq 'HASH') {
-				$DIRECTIVES{$_}
-			} else {{
-				name         => $_,
-				req_override => Apache2::Const::OR_ALL,
+unless (exists $ENV{AUTOMATED_TESTING}) {
+	eval {
+		Apache2::Module::add(__PACKAGE__, [
+			map {
+				if (ref($DIRECTIVES{$_}) eq 'HASH') {
+					$DIRECTIVES{$_}
+				} else {{
+					name         => $_,
+					req_override => Apache2::Const::OR_ALL,
 				args_how     => Apache2::Const::ITERATE,
-			}}
-		} keys %DIRECTIVES
-	]);
-}; if ($@) { warn $@; print $@; }
+				}}
+			} keys %DIRECTIVES
+		]);
+	};
+	warn $@ if $@;
+}
 
 sub dump_apache_configuration {
 	my $r = shift;
@@ -701,21 +732,23 @@ sub get_config {
 }
 
 sub AddAlt {
-	push_val('AddAlt', $_[0], $_[1], join(' ',$_[2],$_[3]));
-	push_val('AddAltRegex', $_[0], $_[1], [( $_[2],glob2regex($_[3]) )]);
+	push_val_on_key('AddAlt', $_[0], $_[1], join(' ',$_[2],$_[3]));
+	push_val_on_key('AddAltRegex', $_[0], $_[1], [( $_[2],glob2regex($_[3]) )]);
 }
 
 sub AddAltByEncoding  {
-	push_val('AddAltByEncoding',  @_);
-	push_val('AddAltByEncodingRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+	push_val_on_key('AddAltByEncoding',  @_);
+	push_val_on_key('AddAltByEncodingRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
 }
 
 sub AddAltByType {
-	push_val('AddAltByType', @_);
-	push_val('AddAltByTypeRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+	push_val_on_key('AddAltByType', @_);
+	push_val_on_key('AddAltByTypeRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
 }
 
-sub AddDescription    { push_val('AddDescription',    @_) }
+sub AddDescription {
+	push_val('AddDescription', $_[0], $_[1], [( $_[3], $_[2] )]);
+}
 
 sub AddIcon {
 	push_val('AddIcon', $_[0], $_[1], join(' ',$_[2],$_[3]));
@@ -725,19 +758,19 @@ sub AddIcon {
 		$alt = $1;
 		$icon = $2;
 	}
-	push_val('AddIconRegex', $_[0], $_[1], 
-			[( $alt,$icon,glob2regex($_[3]) )],
+	push_val_on_key('AddIconRegex', $_[0], $_[1],
+			glob2regex($_[3]), $alt,$icon,
 		);
 }
 
 sub AddIconByEncoding {
-	push_val('AddIconByEncoding', @_);
-	push_val('AddIconByEncodingRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+	push_val_on_key('AddIconByEncoding', @_);
+	push_val_on_key('AddIconByEncodingRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
 }
 
 sub AddIconByType {
-	push_val('AddIconByType', @_);
-	push_val('AddIconByTypeRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
+	push_val_on_key('AddIconByType', @_);
+	push_val_on_key('AddIconByTypeRegex', $_[0], $_[1], [( $_[2],$_[3] )]);
 }
 
 sub IndexIgnore {
@@ -779,6 +812,15 @@ sub push_val {
 	}
 }
 
+sub push_val_on_key {
+	my ($key, $self, $parms, $key2, @args) = @_;
+	push @{ $self->{$key}->{$key2} }, @args;
+	unless ($parms->path) {
+		my $srv_cfg = Apache2::Module::get_config($self,$parms->server);
+		push @{ $srv_cfg->{$key}->{$key2} }, @args;
+	}
+}
+
 sub defaults {
 	my ($class, $parms) = @_;
 	return bless {
@@ -791,6 +833,8 @@ sub defaults {
 			FileTypesFilename => 'filetypes.dat',
 		}, $class;
 }
+
+# http://perl.apache.org/docs/2.0/user/config/custom.html#Examples
 
 sub merge {
 	my ($base, $add) = @_;
