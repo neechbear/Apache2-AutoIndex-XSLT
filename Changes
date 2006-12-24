@@ -1,4 +1,8 @@
-Version 0.00_1 - 8th Devember 2006
+Version 0.01 - 25th December 2006
+    + Changed default value of 'mycomputer_root' variable
+      in examples/index.xslt from 'true' to 'false'.
+
+Version 0.00_1 - 8th December 2006
     + Added some modules to be loaded that were mistakenly
       not loaded.
     + Updated Build.PL to reflect all the modules that are
