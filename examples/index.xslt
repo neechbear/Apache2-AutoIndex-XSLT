@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="2.0">
 	<xsl:output encoding="iso-8859-1" method="html" indent="yes" doctype-public="-//W3C//DTD XHTML 1.0 Strict//EN"/>
-	<xsl:variable name="mycomputer_root" select="'true'"/>
+	<xsl:variable name="mycomputer_root" select="'false'"/>
 	<xsl:variable name="sortorder_href">
 		<xsl:choose>
 			<xsl:when test="/index/options/option[@name='O']/@value = 'D'"><xsl:text>A</xsl:text></xsl:when>
