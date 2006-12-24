@@ -6,6 +6,8 @@ Version 0.01 - 25th December 2006
       ways.
     + Added propper parsing of apache configuration
       directives.
+    + Mostly implemented the AddIcon configuration
+      directive handling code.
 
 Version 0.00_1 - 8th December 2006
     + Added some modules to be loaded that were mistakenly
