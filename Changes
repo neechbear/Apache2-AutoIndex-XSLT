@@ -1,3 +1,8 @@
+Version 0.02 - 29th December 2006
+    + Fixed examples/apache/htdocs/favicon.ico.
+    + Mostly implemented the AddDescription configuration
+      directive handling code.
+
 Version 0.01 - 25th December 2006
     + Still development code.
     + Changed default value of 'mycomputer_root' variable

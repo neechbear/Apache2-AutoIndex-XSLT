@@ -393,13 +393,20 @@ sub build_attributes {
 		$attr->{href} = URI::Escape::uri_escape($id);
 		$attr->{href} .= '/' if $type eq 'dir';
 		$attr->{title} = XML::Quote::xml_quote($id);
-		$attr->{desc} = $type eq 'dir' ? 'File Folder' : 'File';
-		if ($attr->{ext}) {
-			$attr->{desc} = exists $FILETYPES{lc($attr->{ext})} ?
-					$FILETYPES{lc($attr->{ext})}->{DisplayName} || '' : '';
-			$attr->{desc} ||= sprintf('%s File',uc($attr->{ext}));
-			$attr->{desc} = XML::Quote::xml_quote($attr->{desc});
+
+		$attr->{desc} = $type eq 'dir'
+				? 'File Folder'
+				: defined $attr->{ext}
+					? sprintf('%s File',uc($attr->{ext}))
+					: 'File';
+
+		if (exists $dir_cfg->{AddDescription}->{$r->uri.URI::Escape::uri_escape($id)}) {
+			$attr->{desc} = $dir_cfg->{AddDescription}->{$r->uri.URI::Escape::uri_escape($id)};
+		} elsif (defined $FILETYPES{lc($attr->{ext})}->{DisplayName}) {
+			$attr->{desc} = $FILETYPES{lc($attr->{ext})}->{DisplayName};
 		}
+
+		$attr->{desc} = XML::Quote::xml_quote($attr->{desc});
 	}
 
 	return $attr;
@@ -747,7 +754,7 @@ sub AddAltByType {
 }
 
 sub AddDescription {
-	push_val('AddDescription', $_[0], $_[1], [( $_[3], $_[2] )]);
+	add_to_key('AddDescription', $_[0], $_[1], $_[3], $_[2]);
 }
 
 sub AddIcon {
@@ -809,6 +816,29 @@ sub push_val {
 	unless ($parms->path) {
 		my $srv_cfg = Apache2::Module::get_config($self,$parms->server);
 		push @{ $srv_cfg->{$key} }, @args;
+	}
+}
+
+sub add_to_key {
+	my ($key, $self, $parms, $key2, @args) = @_;
+	if (exists $self->{$key}->{$key2}) {
+		$self->{$key}->{$key2} = [($self->{$key}->{$key2})]
+			if !ref($self->{$key}->{$key2});
+		push @{$self->{$key}->{$key2}}, @args;
+	} else {
+		if (@args > 1) { $self->{$key}->{$key2} = \@args; }
+		else { $self->{$key}->{$key2} = $args[0]; }
+	}
+	unless ($parms->path) {
+		my $srv_cfg = Apache2::Module::get_config($self,$parms->server);
+		if (exists $srv_cfg->{$key}->{$key2}) {
+			$srv_cfg->{$key}->{$key2} = [($srv_cfg->{$key}->{$key2})]
+				if !ref($srv_cfg->{$key}->{$key2});
+			push @{$srv_cfg->{$key}->{$key2}}, @args;
+		} else {
+			if (@args > 1) { $srv_cfg->{$key}->{$key2} = \@args; }
+			else { $srv_cfg->{$key}->{$key2} = $args[0]; }
+		}
 	}
 }
 
