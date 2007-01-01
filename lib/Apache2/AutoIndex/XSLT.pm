@@ -1004,12 +1004,12 @@ at all if the XSLT stylesheet used does not use them.
 
 =head2 RenderXSLTEnvVar
 
-     SetEnv RenderXSLT=On
-     BrowserMatch "Firefox/(2.0|1.5|1.0.[234567])" RenderXSLT=Off
-     BrowserMatch "MSIE [67].0" RenderXSLT=Off
-     BrowserMatch "Netscape/8" RenderXSLT=Off
-     BrowserMatch "Opera/9" RenderXSLT=Off
-     RenderXSLTEnvVar RenderXSLT 
+    SetEnvIf Remote_Addr . RenderXSLT=On
+    BrowserMatch "Firefox/(2.0|1.5|1.0.[234567])" !RenderXSLT
+    BrowserMatch "MSIE [67].0" !RenderXSLT
+    BrowserMatch "Netscape/8" !RenderXSLT
+    BrowserMatch "Opera/9" !RenderXSLT
+    RenderXSLTEnvVar RenderXSLT
 
 =head2 AddAlt
 
