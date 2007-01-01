@@ -146,14 +146,15 @@ sub handler {
 		if ($dir_cfg->{RenderXSLT} ||
 			(!exists $dir_cfg->{RenderXSLT} && 
 			defined $dir_cfg->{RenderXSLTEnvVar} &&
-			$ENV{$dir_cfg->{RenderXSLTEnvVar}})
+			defined $ENV{$dir_cfg->{RenderXSLTEnvVar}} &&
+			$ENV{$dir_cfg->{RenderXSLTEnvVar}} =~ /^\s*(On|1|Yes|True)\s*$/i)
 				) {
 			eval {
 				require XML::LibXSLT;
 				require XML::LibXML;
 				$render = 1;
 			};
-			$r->log_error('Failed to load XML::LibXML or XML::LibXSLT modules: %s', $@) if $@;
+			$r->log_error('Failed to load XML::LibXML or XML::LibXSLT modules: ', $@) if $@;
 		}
 
 		# Send the appropriate content type
