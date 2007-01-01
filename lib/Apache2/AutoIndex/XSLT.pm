@@ -994,6 +994,23 @@ of the I<options> elements presented in the output XML and the XSLT stylesheet.
 As a result, some of these configuration directives will do little or nothing
 at all if the XSLT stylesheet used does not use them.
 
+=head2 FileTypesFilename
+
+     FileTypesFilename
+
+=head2 RenderXSLT
+
+     RenderXSLT On
+
+=head2 RenderXSLTEnvVar
+
+     SetEnv RenderXSLT=1
+     BrowserMatch "Firefox/(2.0|1.5|1.0.[234567])" RenderXSLT=0
+     BrowserMatch "MSIE [67].0" RenderXSLT=0
+     BrowserMatch "Netscape/8" RenderXSLT=0
+     BrowserMatch "Opera/9" RenderXSLT=0
+     RenderXSLTEnvVar RenderXSLT
+
 =head2 AddAlt
 
      AddAlt "PDF file" *.pdf
@@ -1161,8 +1178,6 @@ The I<DirectorySlash> directive determines, whether or not to fixup URLs
 pointing to a directory or not. With this enabled (which is the default), if a
 user requests a resource without a trailing slash, which points to a directory,
 the user will be redirected to the same resource, but with trailing slash.
-
-=head2 FileTypesFilename
 
 =head1 XSLT STYLESHEET
 
