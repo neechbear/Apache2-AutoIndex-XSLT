@@ -61,7 +61,7 @@ use Apache2::URI qw(); # $r->construct_url
 use Apache2::Access qw(); # $r->allow_options
 
 #use Apache2::Directive qw();  # Possibly not needed
-#use Apache2::SubRequest qw(); # Possibly not needed
+use Apache2::SubRequest qw(); # Needed for subrequests :)
 
 # Start here ...
 # http://perl.apache.org/docs/2.0/user/config/custom.html
@@ -140,15 +140,50 @@ sub handler {
 
 	# Return a directory listing if we're allowed to
 	if ($r->allow_options & Apache2::Const::OPT_INDEXES) {
-		$r->content_type('text/xml; charset="utf-8"');
+
+		# Should we render the XSLT or not?
+		my $render = 0;
+		$r->log_error('$dir_cfg->{RenderXSLT} => "'.$dir_cfg->{RenderXSLT}.'"');
+		if ($dir_cfg->{RenderXSLT}) {
+			eval {
+				require XML::LibXSLT;
+				require XML::LibXML;
+				$render = 1;
+			};
+			$r->log_error('Failed to load XML::LibXML or XML::LibXSLT modules: %s', $@) if $@;
+		}
+
+		# Send the appropriate content type
+		my $content_type = $render
+					? 'text/html'
+					: 'text/xml; charset="utf-8"';
+		$r->content_type($content_type);
 		return Apache2::Const::OK if $r->header_only;
 
 		# The dir_xml subroutine will actually print and output
 		# all the XML DTD and XML, returning an OK if everything
 		# was successful.
 		my $rtn = Apache2::Const::SERVER_ERROR;
-		eval { $rtn = dir_xml($r,$dir_cfg,$qstring); };
-		if ($@) {
+		my $xml;
+		eval {
+			$xml = dir_xml($r,$dir_cfg,$qstring);
+			unless ($render) {
+				print $xml;
+			} else {
+				my $parser = XML::LibXML->new();
+				my $source = $parser->parse_string($xml);
+
+				my $subr = $r->lookup_uri($dir_cfg->{IndexStyleSheet});
+				my $xslt = XML::LibXSLT->new();
+				my $style_doc = $parser->parse_file($subr->filename);
+
+				my $stylesheet = $xslt->parse_stylesheet($style_doc);
+				my $results = $stylesheet->transform($source);
+				print $stylesheet->output_string($results);
+			}
+			$rtn = Apache2::Const::OK;
+		};
+		if (!defined $xml || $@) {
 			$COUNTERS{Errors}++;
 			warn $@, print $@;
 		};
@@ -262,6 +297,7 @@ sub init_handler {
 
 sub dir_xml {
 	my ($r,$dir_cfg,$qstring) = @_;
+	my $xml = '';
 
 	# Increment listings counter
 	$COUNTERS{Listings}++;
@@ -283,10 +319,12 @@ sub dir_xml {
 	}
 
 	# Send the XML header and top of the index tree
-	print_xml_header($r,$dir_cfg);
-	printf "<index path=\"%s\" href=\"%s\" >\n", $r->uri, $r->construct_url;
-	print_xml_options($r,$qstring,$dir_cfg);
-	print "\t<updir icon=\"/icons/__back.png\" />\n" unless $r->uri =~ m,^/?$,;
+	$xml .= xml_header($r,$dir_cfg);
+	$xml .= sprintf("<index path=\"%s\" href=\"%s\" >\n",
+				$r->uri, $r->construct_url);
+	$xml .= xml_options($r,$qstring,$dir_cfg);
+	$xml .= "\t<updir icon=\"/icons/__back.png\" />\n"
+				unless $r->uri =~ m,^/?$,;
 
 	# Build a list of attributes for each item in the directory and then
 	# print it as an element in the index tree.
@@ -299,7 +337,7 @@ sub dir_xml {
 		my $type = file_type($r,$id,$filename);
 		my $attr = build_attributes($r,$dir_cfg,$id,$filename,$type);
 
-		printf("\t<%s %s />\n", $type, join(' ',
+		$xml .= sprintf("\t<%s %s />\n", $type, join(' ',
 					map { sprintf("\n\t\t%s=\"%s\"",$_,$attr->{$_})
 							if defined $_ && defined $attr->{$_} }
 						keys(%{$attr})
@@ -310,21 +348,23 @@ sub dir_xml {
 	}
 
 	# Close the index tree, directory handle and return
-	print "</index>\n";
+	$xml .= "</index>\n";
 	closedir($dh);
-	return Apache2::Const::OK;
+
+	return $xml;
 }
 
 
-sub print_xml_options {
+sub xml_options {
 	my ($r,$qstring,$dir_cfg) = @_;
+	my $xml = '';
 
 	my $format = "\t\t<option name=\"%s\" value=\"%s\" />\n";
-	print "\t<options>\n";
+	$xml .= "\t<options>\n";
 
 	# Query string options
 	for my $option (qw(C O F V P)) {
-		printf($format,$option,$qstring->{$option})
+		$xml .= sprintf($format,$option,$qstring->{$option})
 			if defined $qstring->{$option} &&
 				$qstring->{$option} =~ /\S+/;
 	}
@@ -339,11 +379,12 @@ sub print_xml_options {
 				)) {
 			# Don't bother printing stuff that we only have
 			# some confusing internal complex data structure for
-			printf($format,$d,$value) unless ref($value);
+			$xml .= sprintf($format,$d,$value) unless ref($value);
 		}
 	}
 
-	print "\t</options>\n";
+	$xml .= "\t</options>\n";
+	return $xml;
 }
 
 
@@ -419,15 +460,16 @@ sub file_type {
 }
 
 
-sub print_xml_header {
+sub xml_header {
 	my ($r,$dir_cfg) = @_;
+	my $xml = '';
 
 	my $xslt = $dir_cfg->{IndexStyleSheet} || '';
 	my $type = $xslt =~ /\.css/ ? 'text/css' : 'text/xsl';
 
-	print qq{<?xml version="1.0"?>\n};
-	print qq{<?xml-stylesheet type="$type" href="$xslt"?>\n} if $xslt;
-	print qq{$_\n} for (
+	$xml .= qq{<?xml version="1.0"?>\n};
+	$xml .= qq{<?xml-stylesheet type="$type" href="$xslt"?>\n} if $xslt;
+	$xml .= qq{$_\n} for (
 			'<!DOCTYPE index [',
 			'  <!ELEMENT index (options?, updir?, (file | dir)*)>',
 			'  <!ATTLIST index href      CDATA #REQUIRED',
@@ -473,6 +515,8 @@ sub print_xml_header {
 			'                  icon      CDATA #IMPLIED>',
 			']>',
 		);
+
+	return $xml;
 }
 
 
@@ -582,6 +626,12 @@ sub file_mode {
 				req_override => Apache2::Const::OR_ALL,
 				args_how     => Apache2::Const::TAKE1,
 				errmsg       => 'FileTypesFilename file',
+			},
+		RenderXSLT => {
+				name         => 'RenderXSLT',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::FLAG,
+				errmsg       => 'RenderXSLT On|Off',
 			},
 
 	# http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html
@@ -695,7 +745,7 @@ unless (exists $ENV{AUTOMATED_TESTING}) {
 				} else {{
 					name         => $_,
 					req_override => Apache2::Const::OR_ALL,
-				args_how     => Apache2::Const::ITERATE,
+					args_how     => Apache2::Const::ITERATE,
 				}}
 			} keys %DIRECTIVES
 		]);
@@ -794,6 +844,7 @@ sub IndexStyleSheet   { set_val('IndexStyleSheet',    @_) }
 sub ReadmeName        { set_val('ReadmeName',         @_) }
 sub DirectorySlash    { set_val('DirectorySlash',     @_) }
 sub FileTypesFilename { set_val('FileTypesFilename',  @_) }
+sub RenderXSLT        { set_val('RenderXSLT',         @_) }
 
 sub DIR_CREATE { defaults(@_) }
 sub SERVER_CREATE { defaults(@_) }
@@ -804,8 +855,7 @@ sub set_val {
 	my ($key, $self, $parms, $arg) = @_;
 	$self->{$key} = $arg;
 	unless ($parms->path) {
-		my $srv_cfg = Apache2::Module::get_config($self,
-		$parms->server);
+		my $srv_cfg = Apache2::Module::get_config($self,$parms->server);
 		$srv_cfg->{$key} = $arg;
 	}
 }
@@ -861,6 +911,7 @@ sub defaults {
 			DefaultIcon => '/icons/__unknown.png',
 			IndexIgnore => [()],
 			FileTypesFilename => 'filetypes.dat',
+			RenderXSLT => 0,
 		}, $class;
 }
 
