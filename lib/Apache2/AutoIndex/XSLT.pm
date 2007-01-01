@@ -143,8 +143,11 @@ sub handler {
 
 		# Should we render the XSLT or not?
 		my $render = 0;
-		$r->log_error('$dir_cfg->{RenderXSLT} => "'.$dir_cfg->{RenderXSLT}.'"');
-		if ($dir_cfg->{RenderXSLT}) {
+		if ($dir_cfg->{RenderXSLT} ||
+			(!exists $dir_cfg->{RenderXSLT} && 
+			defined $dir_cfg->{RenderXSLTEnvVar} &&
+			$ENV{$dir_cfg->{RenderXSLTEnvVar}})
+				) {
 			eval {
 				require XML::LibXSLT;
 				require XML::LibXML;
@@ -633,6 +636,12 @@ sub file_mode {
 				args_how     => Apache2::Const::FLAG,
 				errmsg       => 'RenderXSLT On|Off',
 			},
+		RenderXSLTEnvVar => {
+				name         => 'RenderXSLTEnvVar',
+				req_override => Apache2::Const::OR_ALL,
+				args_how     => Apache2::Const::TAKE1,
+				errmsg       => 'RenderXSLTEnvVar variable name',
+			},
 
 	# http://httpd.apache.org/docs/2.2/mod/mod_autoindex.html
 		AddAlt => {
@@ -845,6 +854,7 @@ sub ReadmeName        { set_val('ReadmeName',         @_) }
 sub DirectorySlash    { set_val('DirectorySlash',     @_) }
 sub FileTypesFilename { set_val('FileTypesFilename',  @_) }
 sub RenderXSLT        { set_val('RenderXSLT',         @_) }
+sub RenderXSLTEnvVar  { set_val('RenderXSLTEnvVar',   @_) }
 
 sub DIR_CREATE { defaults(@_) }
 sub SERVER_CREATE { defaults(@_) }
@@ -911,7 +921,6 @@ sub defaults {
 			DefaultIcon => '/icons/__unknown.png',
 			IndexIgnore => [()],
 			FileTypesFilename => 'filetypes.dat',
-			RenderXSLT => 0,
 		}, $class;
 }
 
