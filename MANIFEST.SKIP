@@ -16,3 +16,4 @@ examples/windows_example1.png
 examples/windows_example2.png
 test
 t/TEST
+t/htdocs/index.html
