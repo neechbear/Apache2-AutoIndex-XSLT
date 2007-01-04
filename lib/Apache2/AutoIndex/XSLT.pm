@@ -125,7 +125,7 @@ sub handler {
 	# Dump the configuration out to screen
 	if (defined $qstring->{CONFIG}) {
 		$r->content_type('text/plain');
-		print dump_apache_configuration($r);
+		$r->print(dump_apache_configuration($r));
 		return Apache2::Const::OK;
 	}
 
@@ -172,7 +172,7 @@ sub handler {
 		eval {
 			$xml = dir_xml($r,$dir_cfg,$qstring);
 			unless ($render) {
-				print $xml;
+				$r->print($xml);
 			} else {
 				my $parser = XML::LibXML->new();
 				my $source = $parser->parse_string($xml);
@@ -183,13 +183,14 @@ sub handler {
 
 				my $stylesheet = $xslt->parse_stylesheet($style_doc);
 				my $results = $stylesheet->transform($source);
-				print $stylesheet->output_string($results);
+				$r->print($stylesheet->output_string($results));
 			}
 			$rtn = Apache2::Const::OK;
 		};
 		if (!defined $xml || $@) {
 			$COUNTERS{Errors}++;
-			warn $@, print $@;
+			$r->log_error($@);
+			$r->print($@);
 		};
 		return $rtn;
 
