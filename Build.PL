@@ -25,7 +25,10 @@ use strict;
 use Module::Build;
 use vars qw($build);
 
-$build = Module::Build->new(
+my $build_pkg = eval { require Apache::TestMB }
+	? 'Apache::TestMB' : 'Module::Build';
+
+$build = $build_pkg->new(
 		module_name        => 'Apache2::AutoIndex::XSLT',
 		license            => 'open_source',
 		create_makefile_pl => 'passthrough',
@@ -34,6 +37,7 @@ $build = Module::Build->new(
 		sign               => 0,
 
 		requires => {
+			'mod_perl2'            => '2.000001',
 			'File::Spec'           => 0,
 			'Fcntl'                => 0,
 			'XML::Quote'           => 0,
@@ -52,8 +56,13 @@ $build = Module::Build->new(
 		},
 
 		build_requires => {
+			'mod_perl2'            => '2.000001',
 			'Test'                 => 0,
 			'Test::More'           => 0,
+			'Apache::Test'         => 0,
+			'Apache::TestUtil'     => 0,
+			'Apache::TestRequest'  => 0,
+			'Apache::TestMB',      => 0,
 			'Test::Pod'            => 0,
 			'Test::Pod::Coverage'  => 0,
 		},
