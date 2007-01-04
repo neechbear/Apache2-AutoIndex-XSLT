@@ -501,6 +501,7 @@ sub xml_header {
 			'                  size      CDATA #REQUIRED',
 			'                  nicesize  CDATA #IMPLIED',
 			'                  icon      CDATA #IMPLIED',
+			'                  alt       CDATA #IMPLIED',
 			'                  ext       CDATA #IMPLIED>',
 			'  <!ELEMENT dir   EMPTY>',
 			'  <!ATTLIST dir   href      CDATA #REQUIRED',
@@ -517,6 +518,7 @@ sub xml_header {
 			'                  perms     CDATA #REQUIRED',
 			'                  size      CDATA #REQUIRED',
 			'                  nicesize  CDATA #IMPLIED',
+			'                  alt       CDATA #IMPLIED',
 			'                  icon      CDATA #IMPLIED>',
 			']>',
 		);

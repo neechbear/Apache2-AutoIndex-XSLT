@@ -413,7 +413,7 @@
 							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
 							<img width="16" height="16">
 								<xsl:attribute name="src"><xsl:value-of select="$icon"/></xsl:attribute>
-								<xsl:attribute name="alt">[<xsl:value-of select="@ext"/>]</xsl:attribute>
+								<xsl:attribute name="alt">[<xsl:value-of select="@alt"/>]</xsl:attribute>
 							</img>
 						</a>
 						<a onmouseout="window.status='';return true">
@@ -489,7 +489,7 @@
 							<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
 							<img width="16" height="16">
 								<xsl:attribute name="src"><xsl:value-of select="$icon"/></xsl:attribute>
-								<xsl:attribute name="alt">[<xsl:value-of select="@ext"/>]</xsl:attribute>
+								<xsl:attribute name="alt">[<xsl:value-of select="@alt"/>]</xsl:attribute>
 							</img>
 						</a>
 						<a onmouseout="window.status='';return true">
@@ -521,7 +521,7 @@
 					<xsl:attribute name="href"><xsl:value-of select="@href"/></xsl:attribute>
 					<img width="16" height="16">
 						<xsl:attribute name="src"><xsl:value-of select="@icon"/></xsl:attribute>
-						<xsl:attribute name="alt">[<xsl:value-of select="@ext"/>]</xsl:attribute>
+						<xsl:attribute name="alt">[<xsl:value-of select="@alt"/>]</xsl:attribute>
 					</img>
 				</a>
 				<a onmouseout="window.status='';return true">
