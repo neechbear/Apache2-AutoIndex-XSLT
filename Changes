@@ -8,6 +8,7 @@ Version 0.02 - 3rd January 2007
       XML::LibXML and XML::LibXSLT modules.
     + Updated example configuration to include dynamic
       server-side XSLT rendering for older browsers.
+    + Added some Apache::Test unit tests.
 
 Version 0.01 - 25th December 2006
     + Still development code.
