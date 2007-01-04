@@ -29,7 +29,7 @@ my $data = GET_BODY $url ;
 
 for (@options) {
 	my ($option) = $_ =~ /name="(.+?)"/;
-	(my $regex = $_) =~ s/\./\\./;
+	(my $regex = $_) =~ s/([\.\[\]\(\)\{\}\*\+\?\^\$])/\\$1/g;
 	ok t_cmp(
 		$data,
 		qr{$regex},
