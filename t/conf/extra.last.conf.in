@@ -53,7 +53,7 @@ IndexIgnore robots.txt sitemap.gz googlee820414a2b69240d.html
 
 # Set this to true if you want to pre-
 # render the XML/XSLT on the server-side.
-#RenderXSLT Off
+RenderXSLT Off
 
 # Set the handler for the / root of the website
 # to use Apache2::AutoIndex::XSLT.
