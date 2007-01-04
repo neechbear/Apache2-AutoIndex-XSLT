@@ -238,7 +238,7 @@ sub transhandler {
 #
 
 # Let Apache2::Status know we're here if it's hanging around
-unless (exists $ENV{AUTOMATED_TESTING}) {
+if (exists $ENV{MOD_PERL}) {
 	eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
 		\&status) if Apache2::Module::loaded('Apache2::Status'); };
 }
@@ -746,7 +746,7 @@ sub file_mode {
 	);
 
 # Register our interest in a bunch of Apache configuration directives
-unless (exists $ENV{AUTOMATED_TESTING}) {
+if (exists $ENV{MOD_PERL}) {
 	eval {
 		Apache2::Module::add(__PACKAGE__, [
 			map {

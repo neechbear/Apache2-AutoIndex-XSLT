@@ -58,7 +58,7 @@ IndexIgnore robots.txt sitemap.gz googlee820414a2b69240d.html
 # Set the handler for the / root of the website
 # to use Apache2::AutoIndex::XSLT.
 
-<Location /test/Apache2-AutoIndex-XSLT>
+<Location "/">
     SetHandler modperl
     PerlResponseHandler Apache2::AutoIndex::XSLT
     Options +Indexes +FollowSymLinks
