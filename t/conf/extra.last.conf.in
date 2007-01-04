@@ -55,6 +55,12 @@ IndexIgnore robots.txt sitemap.gz googlee820414a2b69240d.html
 # render the XML/XSLT on the server-side.
 RenderXSLT Off
 
+AddDescription "The planet Mars" /fake.gif
+
+AddIcon (IMG,/icons/image.xbm) .gif .jpg .xbm
+AddIcon /icons/dir.xbm ^^DIRECTORY^^
+AddIcon /icons/backup.xbm *~ 
+
 # Set the handler for the / root of the website
 # to use Apache2::AutoIndex::XSLT.
 

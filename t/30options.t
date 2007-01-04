@@ -15,6 +15,11 @@ my @options = (
 		'<option name="FileTypesFilename" value="filetypes.dat" />',
 		'<option name="DefaultIcon" value="/icons/__unknown.png" />',
 		'<option name="RenderXSLT" value="0" />',
+		'<option name="AddIcon" value="(IMG,/icons/image.xbm) .gif" />',
+		'<option name="AddIcon" value="(IMG,/icons/image.xbm) .jpg" />',
+		'<option name="AddIcon" value="(IMG,/icons/image.xbm) .xbm" />',
+		'<option name="AddIcon" value="/icons/dir.xbm ^^DIRECTORY^^" />',
+		'<option name="AddIcon" value="/icons/backup.xbm *~" />',
 	);
 
 plan tests => scalar(@options);
