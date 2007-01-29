@@ -1,3 +1,7 @@
+Version 0.03 - 29th January 2007
+    + Removed execute bits from Build.PL because that's
+      bad. oops. I'll finish the rest soon I promise. ;-)
+
 Version 0.02 - 3rd January 2007
     + Fixed examples/apache/htdocs/favicon.ico.
     + Mostly implemented the AddDescription configuration
