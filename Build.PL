@@ -25,11 +25,9 @@ use strict;
 use Module::Build;
 use vars qw($build);
 
-my $build_pkg = eval { require Apache::TestMB }
-	? 'Apache::TestMB' : 'Module::Build';
-
-$build = $build_pkg->new(
-		module_name        => 'Apache2::AutoIndex::XSLT',
+my $module = 'Apache2::AutoIndex::XSLT';
+$build = Module::Build->new(
+		module_name        => $module,
 		license            => 'open_source',
 		create_makefile_pl => 'passthrough',
 		create_readme      => 1,
@@ -37,7 +35,6 @@ $build = $build_pkg->new(
 		sign               => 0,
 
 		requires => {
-			'mod_perl2'            => '2.000001',
 			'File::Spec'           => 0,
 			'Fcntl'                => 0,
 			'XML::Quote'           => 0,
@@ -56,13 +53,8 @@ $build = $build_pkg->new(
 		},
 
 		build_requires => {
-			'mod_perl2'            => '2.000001',
 			'Test'                 => 0,
 			'Test::More'           => 0,
-			'Apache::Test'         => 0,
-			'Apache::TestUtil'     => 0,
-			'Apache::TestRequest'  => 0,
-			'Apache::TestMB',      => 0,
 			'Test::Pod'            => 0,
 			'Test::Pod::Coverage'  => 0,
 		},
@@ -108,7 +100,7 @@ sub may_send_version_information {
 
 	my $str = sprintf('%s?%s=%s&%s=%s&%s=%s&%s=%s&%s=%s&%s=%s',
 			'http://perlgirl.org.uk/lib/usage.cgi',
-			'name',     $build->dist_name(),
+			'name',     $module,
 			'version',  $build->dist_version(),
 			'osname',   $Config::Config{osname},
 			'archname', $Config::Config{archname},
@@ -130,9 +122,8 @@ sub may_send_version_information {
 		alarm 0;
 	};
 
-	return $send ? $str : undef;
+	return defined $send && !ref($send) && "$send" eq "1" ? $str : undef;
 }
 
 1;
-
 

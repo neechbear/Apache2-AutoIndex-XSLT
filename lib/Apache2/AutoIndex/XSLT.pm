@@ -73,7 +73,7 @@ use Apache2::SubRequest qw(); # Needed for subrequests :)
 # http://www.modperl.com/book/chapters/ch8.html
 
 use vars qw($VERSION %DIRECTIVES %COUNTERS %FILETYPES);
-$VERSION = '0.03' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
+$VERSION = '0.01' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 %COUNTERS = (Listings => 0, Files => 0, Directories => 0, Errors => 0);
 
 
@@ -125,7 +125,7 @@ sub handler {
 	# Dump the configuration out to screen
 	if (defined $qstring->{CONFIG}) {
 		$r->content_type('text/plain');
-		$r->print(dump_apache_configuration($r));
+		print dump_apache_configuration($r);
 		return Apache2::Const::OK;
 	}
 
@@ -172,7 +172,7 @@ sub handler {
 		eval {
 			$xml = dir_xml($r,$dir_cfg,$qstring);
 			unless ($render) {
-				$r->print($xml);
+				print $xml;
 			} else {
 				my $parser = XML::LibXML->new();
 				my $source = $parser->parse_string($xml);
@@ -183,14 +183,13 @@ sub handler {
 
 				my $stylesheet = $xslt->parse_stylesheet($style_doc);
 				my $results = $stylesheet->transform($source);
-				$r->print($stylesheet->output_string($results));
+				print $stylesheet->output_string($results);
 			}
 			$rtn = Apache2::Const::OK;
 		};
 		if (!defined $xml || $@) {
 			$COUNTERS{Errors}++;
-			$r->log_error($@);
-			$r->print($@);
+			warn $@, print $@;
 		};
 		return $rtn;
 
@@ -239,7 +238,7 @@ sub transhandler {
 #
 
 # Let Apache2::Status know we're here if it's hanging around
-if (exists $ENV{MOD_PERL}) {
+unless (exists $ENV{AUTOMATED_TESTING}) {
 	eval { Apache2::Status->menu_item('AutoIndex' => sprintf('%s status',__PACKAGE__),
 		\&status) if Apache2::Module::loaded('Apache2::Status'); };
 }
@@ -501,7 +500,6 @@ sub xml_header {
 			'                  size      CDATA #REQUIRED',
 			'                  nicesize  CDATA #IMPLIED',
 			'                  icon      CDATA #IMPLIED',
-			'                  alt       CDATA #IMPLIED',
 			'                  ext       CDATA #IMPLIED>',
 			'  <!ELEMENT dir   EMPTY>',
 			'  <!ATTLIST dir   href      CDATA #REQUIRED',
@@ -518,7 +516,6 @@ sub xml_header {
 			'                  perms     CDATA #REQUIRED',
 			'                  size      CDATA #REQUIRED',
 			'                  nicesize  CDATA #IMPLIED',
-			'                  alt       CDATA #IMPLIED',
 			'                  icon      CDATA #IMPLIED>',
 			']>',
 		);
@@ -749,7 +746,7 @@ sub file_mode {
 	);
 
 # Register our interest in a bunch of Apache configuration directives
-if (exists $ENV{MOD_PERL}) {
+unless (exists $ENV{AUTOMATED_TESTING}) {
 	eval {
 		Apache2::Module::add(__PACKAGE__, [
 			map {
