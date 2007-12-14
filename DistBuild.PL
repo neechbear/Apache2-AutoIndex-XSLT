@@ -44,6 +44,7 @@ if ($ENV{CVSROOT} && -d 'CVS' && !-d '.svn' && `which cvs2cl.pl`) {
 }
 
 unlink 'MANIFEST';
+unlink 't/TEST';
 stage('Updating MANIFEST');
 $build->dispatch('manifest');
 
@@ -67,6 +68,7 @@ my @tarballs = ();
 if (check_repository(uncommited_only => 1, silent => 1, ignore => "(META.yml|Makefile.PL|README|blib|_build|Build|MANIFEST|tarballs/)")) {
 	print "Uncommited files; skipping ...\n";
 } else {
+	$build->dispatch('distclean');
 	$build->dispatch('distcheck');
 	$build->dispatch('dist');
 	$build->dispatch('ppmdist');
@@ -88,7 +90,7 @@ exit;
 sub check_repository {
 	my %opts = @_;
 	my $uncommited_files = 0;
-	$opts{ignore} ||= '(META.yml|Makefile.PL|README|blib|_build|Build|MANIFEST)';
+	$opts{ignore} ||= '(META.yml|Makefile.PL|README|blib|_build|Build|MANIFEST|t/conf/(apache_test_config.pm|extra.last.conf|httpd.conf|modperl_inc.pl|modperl_startup.pl)|t/logs/)';
 
 	my ($cvs,$svn) = (0,0);
 	if (-d 'CVS' && !-d '.svn') {
@@ -109,7 +111,7 @@ sub check_repository {
 				($opts{silent} ? ' >/dev/null 2>&1 ' : ''),
 			);
 		my $rtn = $build->do_system($cmd);
-		$uncommited_files = $rtn if $opts{uncommited_only};
+		$uncommited_files = !$rtn if $opts{uncommited_only};
 
 	} elsif ($svn) {
 		stage('Checking file statuses in Subversion ...') unless $opts{no_stage};
@@ -118,7 +120,7 @@ sub check_repository {
 				($opts{silent} ? ' >/dev/null 2>&1 ' : ''),
 			);
 		my $rtn = $build->do_system($cmd);
-		$uncommited_files = $rtn;
+		$uncommited_files = !$rtn if $opts{uncommited_only};
 	}
 
 	return $uncommited_files;
