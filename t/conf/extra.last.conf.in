@@ -1,4 +1,6 @@
 # this file will be Include-d by @ServerRoot@/conf/httpd.conf
+
+LogLevel debug
   
 # Where Apache2::AutoIndex::XSLT can be found
 #PerlSwitches -I@ServerRoot@/../lib

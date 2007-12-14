@@ -25,8 +25,12 @@ use strict;
 use Module::Build;
 use vars qw($build);
 
+eval {require Apache::TestMB; };
+die qq{Apache::TestMB is requested for testing} if $@;
+
 my $module = 'Apache2::AutoIndex::XSLT';
-$build = Module::Build->new(
+#$build = Module::Build->new(
+$build = Apache::TestMB->new(
 		module_name        => $module,
 		license            => 'open_source',
 		create_makefile_pl => 'passthrough',
@@ -57,6 +61,10 @@ $build = Module::Build->new(
 			'Test::More'           => 0,
 			'Test::Pod'            => 0,
 			'Test::Pod::Coverage'  => 0,
+			'XML::Validate'        => 0,
+			'Apache::Test'         => 0,
+			'Apache::TestUtil'     => 0,
+			'Apache::TestRequest'  => 0,
 		},
 	);
 

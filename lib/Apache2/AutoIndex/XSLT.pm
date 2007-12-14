@@ -63,6 +63,8 @@ use Apache2::Access qw(); # $r->allow_options
 #use Apache2::Directive qw();  # Possibly not needed
 use Apache2::SubRequest qw(); # Needed for subrequests :)
 
+use Apache2::RequestIO qw(); # Needed for $r->print
+
 # Start here ...
 # http://perl.apache.org/docs/2.0/user/config/custom.html
 # http://perl.apache.org/docs/2.0/api/Apache2/Module.html
@@ -73,7 +75,7 @@ use Apache2::SubRequest qw(); # Needed for subrequests :)
 # http://www.modperl.com/book/chapters/ch8.html
 
 use vars qw($VERSION %DIRECTIVES %COUNTERS %FILETYPES);
-$VERSION = '0.01' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
+$VERSION = '0.04' || sprintf('%d.%02d', q$Revision: 531 $ =~ /(\d+)/g);
 %COUNTERS = (Listings => 0, Files => 0, Directories => 0, Errors => 0);
 
 
@@ -125,7 +127,7 @@ sub handler {
 	# Dump the configuration out to screen
 	if (defined $qstring->{CONFIG}) {
 		$r->content_type('text/plain');
-		print dump_apache_configuration($r);
+		$r->print(dump_apache_configuration($r));
 		return Apache2::Const::OK;
 	}
 
@@ -172,7 +174,7 @@ sub handler {
 		eval {
 			$xml = dir_xml($r,$dir_cfg,$qstring);
 			unless ($render) {
-				print $xml;
+				$r->print($xml);
 			} else {
 				my $parser = XML::LibXML->new();
 				my $source = $parser->parse_string($xml);
@@ -183,13 +185,13 @@ sub handler {
 
 				my $stylesheet = $xslt->parse_stylesheet($style_doc);
 				my $results = $stylesheet->transform($source);
-				print $stylesheet->output_string($results);
+				$r->print($stylesheet->output_string($results));
 			}
 			$rtn = Apache2::Const::OK;
 		};
 		if (!defined $xml || $@) {
 			$COUNTERS{Errors}++;
-			warn $@, print $@;
+			warn $@, $r->print($@);
 		};
 		return $rtn;
 
@@ -500,6 +502,7 @@ sub xml_header {
 			'                  size      CDATA #REQUIRED',
 			'                  nicesize  CDATA #IMPLIED',
 			'                  icon      CDATA #IMPLIED',
+			'                  alt       CDATA #IMPLIED',
 			'                  ext       CDATA #IMPLIED>',
 			'  <!ELEMENT dir   EMPTY>',
 			'  <!ATTLIST dir   href      CDATA #REQUIRED',
@@ -516,6 +519,7 @@ sub xml_header {
 			'                  perms     CDATA #REQUIRED',
 			'                  size      CDATA #REQUIRED',
 			'                  nicesize  CDATA #IMPLIED',
+			'                  alt       CDATA #IMPLIED',
 			'                  icon      CDATA #IMPLIED>',
 			']>',
 		);

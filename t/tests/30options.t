@@ -1,9 +1,10 @@
+
 use strict;
 use warnings FATAL => 'all';
   
-use Apache::Test;
-use Apache::TestUtil;
-use Apache::TestRequest 'GET_BODY';
+use Apache::Test qw(plan ok have_lwp);
+use Apache::TestUtil qw(t_cmp);
+use Apache::TestRequest qw(GET_BODY GET);
   
 my @options = (
 		'<option name="ReadmeName" value="FOOTER" />',
@@ -25,7 +26,7 @@ my @options = (
 plan tests => scalar(@options);
   
 my $url = '/';
-my $data = GET_BODY $url ;
+my $data = GET_BODY($url);
 
 for (@options) {
 	my ($option) = $_ =~ /name="(.+?)"/;

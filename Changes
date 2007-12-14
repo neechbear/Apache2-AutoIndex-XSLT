@@ -1,7 +1,24 @@
-Version 0.02 - 29th December 2006
+Version 0.04 - 14th December 2007
+    + Fixed bug 26767 reported by DAXIM
+      http://rt.cpan.org/Ticket/Display.html?id=26767
+    + Fixed Apache::Test / Apache::TestMB test suite not
+      working properly (I think).
+
+Version 0.03 - 29th January 2007
+    + Removed execute bits from Build.PL because that's
+      bad. oops. I'll finish the rest soon I promise. ;-)
+
+Version 0.02 - 3rd January 2007
     + Fixed examples/apache/htdocs/favicon.ico.
     + Mostly implemented the AddDescription configuration
       directive handling code.
+    + Added RenderXSLT and RenderXSLTEnvVar Apache
+      configuration directives to control how and when
+      server-side XSLT rendering will happen using the
+      XML::LibXML and XML::LibXSLT modules.
+    + Updated example configuration to include dynamic
+      server-side XSLT rendering for older browsers.
+    + Added some Apache::Test unit tests.
 
 Version 0.01 - 25th December 2006
     + Still development code.
