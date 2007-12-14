@@ -3,7 +3,7 @@
 #   $Id$
 #   Apache2::AutoIndex::XSLT - XSLT Based Directory Listings
 #
-#   Copyright 2006 Nicola Worthington
+#   Copyright 2006, 2007 Nicola Worthington
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -1204,9 +1204,9 @@ $Id$
 
 =head1 AUTHOR
 
-Nicola Worthington <nicolaw@cpan.org>
+Nicola Worthington <nicolaw@cpan.org>, TFB Technology Ltd.
 
-L<http://perlgirl.org.uk>
+L<http://perlgirl.org.uk>, L<http://www.tfbtechnology.ltd.uk>, L<http://www.tfb.net>
 
 If you like this software, why not show your appreciation by sending the
 author something nice from her
@@ -1223,7 +1223,7 @@ documentation taken.
 
 =head1 COPYRIGHT
 
-Copyright 2006 Nicola Worthington.
+Copyright 2006, 2007 Nicola Worthington.
 
 This software is licensed under The Apache Software License, Version 2.0.
 
